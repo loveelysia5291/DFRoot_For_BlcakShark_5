@@ -4,7 +4,7 @@
 
 # DFRoot (GPL-2.0)
 
-**繁體中文**（預設） ｜ [English](#english)
+**繁體中文** ｜ [English](#english)
 
 Android 12 / kernel 4.19（Black Shark SHARK PAR-H0）的臨時 root 注入工具：
 透過 LKM 取得核心權限，再把 Magisk 的 su 掛到 `/debug_ramdisk`。
