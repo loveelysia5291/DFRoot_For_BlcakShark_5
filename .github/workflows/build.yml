@@ -1,11 +1,11 @@
 name: Build
 
 # One job, one command: ./gradlew :app:assembleRelease.
-# A tag (v4.9.0, ...) also publishes the APK as a GitHub Release asset.
+# Every push to the default branch (or a manual run) builds the APK and
+# republishes the rolling "latest" release - no tagging by hand.
 on:
   push:
     branches: [master, main]
-    tags: ['v*']
   pull_request:
     branches: [master, main]
   workflow_dispatch:
@@ -75,16 +75,46 @@ jobs:
           ls -l app/build/outputs/apk/release/
           sha256sum app/build/outputs/apk/release/DFRoot_*.apk
 
+      - name: Read version
+        id: ver
+        run: |
+          APK=$(ls app/build/outputs/apk/release/DFRoot_*.apk | head -n1)
+          VER=$(basename "$APK" .apk)
+          VER=${VER#DFRoot_}
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "apk=${APK}" >> "$GITHUB_OUTPUT"
+          echo "building DFRoot ${VER}"
+
       - uses: actions/upload-artifact@v4
         with:
           name: DFRoot-release
           path: app/build/outputs/apk/release/DFRoot_*.apk
           if-no-files-found: error
 
+      # No manual tagging: every push to the default branch (and every manual
+      # dispatch) republishes this one rolling release, replacing the APK. The
+      # "latest" tag behind it is created by the action on the first run.
+      # Prefer one release per version? Set tag_name to v${{ steps.ver.outputs.version }}
+      # and the tag will be created from the built versionName instead.
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/DFRoot_*.apk
-          generate_release_notes: true
+          tag_name: latest
+          name: DFRoot ${{ steps.ver.outputs.version }}
+          body: |
+            DFRoot ${{ steps.ver.outputs.version }}
+
+            Android 12 / kernel 4.19 臨時 root 注入工具（Magisk）。
+
+            - 安裝前請先安裝 Magisk，本工具不會幫你安裝或卸載管理器
+            - 部署時直接讀取已安裝管理器的 APK 取出檔案，不需要匯入
+            - su 只存在於 `/debug_ramdisk/su`
+            - arm64-v8a，單一 APK
+
+            簽章：`keystore/debug.keystore`（與舊版 DFRoot 相同，可直接覆蓋安裝）
+          files: ${{ steps.ver.outputs.apk }}
           fail_on_unmatched_files: true
+          make_latest: true
+          draft: false
+          prerelease: false
