@@ -4,10 +4,7 @@ name: Build
 # Every push to the default branch (or a manual run) builds the APK and
 # republishes the rolling "latest" release - no tagging by hand.
 on:
-  push:
-    branches: [master, main]
-  pull_request:
-    branches: [master, main]
+
   workflow_dispatch:
 
 permissions:
