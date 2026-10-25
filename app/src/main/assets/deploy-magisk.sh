@@ -97,7 +97,7 @@ export PATH=/debug_ramdisk:/system/xbin:/system/bin:/sbin:/vendor/bin
 export MAGISKTMP=/debug_ramdisk
 export SHELL=/system/bin/sh
 
-SCRIPT_REV=4.9.1
+SCRIPT_REV=4.9.2
 
 # Emitted as a plain log line so the app can show a real percentage.
 progress() { echo "PROGRESS $1"; }
