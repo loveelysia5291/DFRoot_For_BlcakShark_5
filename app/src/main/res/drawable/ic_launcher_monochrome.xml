@@ -1,20 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Monochrome (themed icon) silhouette: body, neck, lever and pull ring. -->
+<!-- Monochrome (themed icon) silhouette: ring, fuze, body, lever. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
   <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M54,41 C63.4,41 71.5,51.6 71.5,65.5 C71.5,79.4 63.4,88.5 54,88.5 C44.6,88.5 36.5,79.4 36.5,65.5 C36.5,51.6 44.6,41 54,41 Z"/>
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M48.6,29.5 L59.4,29.5 A2.6,2.6 0 0 1 62,32.1 L62,44.5 L46,44.5 L46,32.1 A2.6,2.6 0 0 1 48.6,29.5 Z"/>
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M58.5,27.4 L72.5,27.4 A9.5,9.5 0 0 1 82,36.9 L82,55.5 A4.2,4.2 0 0 1 73.6,55.5 L73.6,38 A2.6,2.6 0 0 0 71,35.4 L58.5,35.4 Z"/>
-  <path
       android:strokeColor="#FFFFFFFF"
-      android:strokeWidth="2.6"
+      android:strokeWidth="2.4"
       android:fillColor="#00000000"
-      android:pathData="M64.2,22.6 C68.4,22.6 71.8,26 71.8,30.2 C71.8,34.4 68.4,37.8 64.2,37.8"/>
+      android:pathData="M54,17.6 A5.2,5.2 0 1 0 54,28 A5.2,5.2 0 1 0 54,17.6 Z"/>
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M52.9,27.2 h2.2 v3.4 h-2.2 z"/>
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M49.2,30 h9.6 a3.2,3.2 0 0 1 3.2,3.2 v7.6 h-16 v-7.6 a3.2,3.2 0 0 1 3.2,-3.2 z"/>
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M54,40 C64.6,40 72,51.8 72,64 C72,76.6 64.6,86 54,86 C43.4,86 36,76.6 36,64 C36,51.8 43.4,40 54,40 Z"/>
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M60,26.6 L72,26.6 A9,9 0 0 1 81,35.6 L81,53.6 A2.2,2.2 0 0 1 76.6,53.6 L76.6,35.8 A2.6,2.6 0 0 0 74,33.2 L60,33.2 Z"/>
 </vector>
