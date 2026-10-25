@@ -97,7 +97,7 @@ export PATH=/debug_ramdisk:/system/xbin:/system/bin:/sbin:/vendor/bin
 export MAGISKTMP=/debug_ramdisk
 export SHELL=/system/bin/sh
 
-SCRIPT_REV=4.9.0
+SCRIPT_REV=4.9.1
 
 # Emitted as a plain log line so the app can show a real percentage.
 progress() { echo "PROGRESS $1"; }
@@ -2294,13 +2294,13 @@ APK_VER_NAME=$($BB unzip -p "$MGR_APK" assets/util_functions.sh 2>/dev/null |
 DEPLOYED_VER=$($BB cat "$SUDIR/installed.version" 2>/dev/null | $BB tr -dc '0-9')
 echo "magisk: installed ${APK_VER_NAME:-?} (${APK_VER_CODE:-0}), deployed ${DEPLOYED_VER:-none}"
 
-APK_MD5=$($BB md5sum "$MGR_APK" 2>/dev/null | $BB awk '{print $1}')
-DEPLOYED_APK_MD5=$($BB cat "$SUDIR/installed.apk.md5" 2>/dev/null | $BB tr -d ' \r\n')
-echo "magisk: apk md5=${APK_MD5:-?} deployed=${DEPLOYED_APK_MD5:-none}"
-if [ -n "$APK_MD5" ] && [ "$APK_MD5" = "$DEPLOYED_APK_MD5" ] && [ -s "$DATABIN/magisk" ]; then
-    echo "magisk: same APK, nothing to extract (fast path)"
-else
-    echo "magisk: new version -> extracting the file set from the installed APK"
+# No md5 comparison any more: the manager APK is no longer hashed, so the
+# staged file set is only refreshed when the user asks for it in the app
+# ("升級 Magisk 版本" -> upgrade.request). Every other run reuses whatever is
+# already staged, and the signature/keystore handling below stays as it was.
+if [ -s "$STAGE/upgrade.request" ]; then
+    rm -f "$STAGE/upgrade.request" 2>/dev/null
+    echo "magisk: upgrade requested -> extracting the file set from the installed APK"
     mkdir -p "$STAGE/chromeos" 2>/dev/null
     _ex_n=0
     for _pair in \
@@ -2338,8 +2338,7 @@ else
     # Old 32-bit leftovers are not part of 31.x; drop them so nothing half-mixed runs.
     rm -f "$STAGE/magisk32" "$STAGE/magisk64" 2>/dev/null
     printf '%s\n' "${APK_VER_CODE:-0}" > "$SUDIR/installed.version" 2>/dev/null
-    printf '%s\n' "$APK_MD5" > "$SUDIR/installed.apk.md5" 2>/dev/null
-    chmod 644 "$SUDIR/installed.version" "$SUDIR/installed.apk.md5" 2>/dev/null
+    chmod 644 "$SUDIR/installed.version" 2>/dev/null
     _iv_uid=$(stat -c %u "$SUDIR" 2>/dev/null)
     [ -n "$_iv_uid" ] && chown "$_iv_uid:$_iv_uid" "$SUDIR/installed.version" 2>/dev/null
     # The extracted files replace whatever the payload manifest described, so
@@ -2350,11 +2349,12 @@ else
 fi
 
 # Fast path (see the "0. prepare + stage" section below for the copy itself).
+# The APK is not hashed any more, so "same set as last time" is simply: a
+# deployed marker exists, the binaries are in place, and this run did not
+# extract or force a new set.
 DPL_FAST=0
-_DEP_APK_MD5=$(/system/bin/cat "$SUDIR/deployed.apk.md5" 2>/dev/null | $BB tr -d ' \r\n')
 if [ -s "$SUDIR/deployed.version" ] && [ -s "$DATABIN/magisk" ] \
-   && [ "${MAGISK_FILES_FORCE:-0}" != "1" ] \
-   && [ -n "$APK_MD5" ] && [ "$APK_MD5" = "$_DEP_APK_MD5" ]; then
+   && [ "${MAGISK_FILES_FORCE:-0}" != "1" ]; then
     DPL_FAST=1
 fi
 
@@ -2927,23 +2927,17 @@ for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
 done
 echo "magisk -V: $($BB timeout 3 "$SQLBIN" -V 2>&1 | $BB head -1)"
 
-# Record what is actually running. The next run compares this APK md5 with the
-# installed manager and, when they match, skips every md5 compare/copy. The
-# marker is only written here, on a successful start, so a half-finished deploy
-# can never enable the fast path.
+# Record what is actually running. The marker is only written here, on a
+# successful start, so a half-finished deploy can never enable the fast path.
 _DPL_VER=$($BB timeout 5 "$SQLBIN" -V 2>&1 | $BB head -1 | $BB tr -dc '0-9')
 if [ -n "$_DPL_VER" ]; then
     printf 'Magisk %s\n' "$_DPL_VER" > "$SUDIR/deployed.version" 2>/dev/null
     chmod 644 "$SUDIR/deployed.version" 2>/dev/null
     _dv_uid=$(pkg_uid df.root 2>/dev/null)
     [ -n "$_dv_uid" ] && chown "$_dv_uid:$_dv_uid" "$SUDIR/deployed.version" 2>/dev/null
-    # The APK md5 is the fast-path key, so it is written only after the whole
-    # file set really landed in DATABIN.
-    if [ -n "$APK_MD5" ]; then
-        printf '%s\n' "$APK_MD5" > "$SUDIR/deployed.apk.md5" 2>/dev/null
-        chmod 644 "$SUDIR/deployed.apk.md5" 2>/dev/null
-        [ -n "$_dv_uid" ] && chown "$_dv_uid:$_dv_uid" "$SUDIR/deployed.apk.md5" 2>/dev/null
-    fi
+    # Leftover from the md5 era; the deploy does not read it any more.
+    rm -f "$SUDIR/deployed.apk.md5" "$SUDIR/installed.apk.md5" \
+          "$SUDIR/manager.apk.md5" 2>/dev/null
     echo "deployed version: Magisk $_DPL_VER (marker updated)"
 if [ "${MAGISK_NEW_SET:-0}" = "1" ]; then
     if sql_run "DELETE FROM strings WHERE key='keystore';" >/dev/null 2>&1; then
@@ -3005,37 +2999,17 @@ fi
 # so the binding has to happen after the daemon answers: write the requester
 # row, stage dyn/current.apk, and let the app bring the UI up (the init worker
 # has no activity binder on this ROM).
-# ---- 6b-0. manager identity gate: version first, then signature ------------
-# Magisk trusts exactly one manager certificate, stored in magisk.db
-# (strings.keystore). When the installed manager APK changes - a different
-# version, or a re-signed / hidden rebuild - that stored blob no longer matches
-# the APK and magiskd stops serving it ("cert: ..." then it removes the
-# manager). The APK is therefore the identity here: if its md5 differs from the
-# one recorded on the last successful bind, the stale certificate is dropped
-# and re-learned from the APK itself. The version is already logged above, so
-# the md5 is only the tie-breaker for "same version, different signature".
-MGR_APK_MD5=""
-if [ -n "$MGR_APK" ] && [ -s "$MGR_APK" ]; then
-    MGR_APK_MD5=$($BB md5sum "$MGR_APK" 2>/dev/null | $BB awk '{print $1}')
-fi
-MGR_APK_MD5_OLD=$($BB cat "$SUDIR/manager.apk.md5" 2>/dev/null | $BB tr -d ' \r\n')
-MGR_ID_CHANGED=0
-if [ -n "$MGR_APK_MD5" ] && [ "$MGR_APK_MD5" != "$MGR_APK_MD5_OLD" ]; then
-    MGR_ID_CHANGED=1
-fi
-if [ "$MGR_ID_CHANGED" = "1" ]; then
-    echo "manager identity: md5=${MGR_APK_MD5} previous=${MGR_APK_MD5_OLD:-none} -> changed"
-    if sql_run "DELETE FROM strings WHERE key='keystore';" >/dev/null 2>&1; then
-        echo "magisk.db: stale manager certificate cleared, re-learned from the new APK"
-    else
-        echo "magisk.db: could not clear the stale certificate (magiskd will re-learn it)"
-    fi
-    printf '%s\n' "$MGR_APK_MD5" > "$SUDIR/manager.apk.md5" 2>/dev/null
-    chmod 644 "$SUDIR/manager.apk.md5" 2>/dev/null
-    _mi_uid=$(pkg_uid df.root 2>/dev/null)
-    [ -n "$_mi_uid" ] && chown "$_mi_uid:$_mi_uid" "$SUDIR/manager.apk.md5" 2>/dev/null
+# ---- 6b-0. manager identity: no md5 any more --------------------------------
+# Magisk trusts exactly one manager certificate (magisk.db strings.keystore).
+# The APK is no longer hashed, so the only thing that can change the trusted
+# manager is the user asking for an upgrade: when upgrade.request was consumed
+# above, the extracted file set is new, MAGISK_NEW_SET=1 and the stale keystore
+# row has already been dropped (see the deployed.version block). Everything
+# else - hidden-manager binding, requester row, stub seeding - is unchanged.
+if [ "${MAGISK_NEW_SET:-0}" = "1" ]; then
+    echo "manager identity: new file set from the installed APK (signature re-learned)"
 else
-    echo "manager identity: md5=${MGR_APK_MD5:-none} (unchanged)"
+    echo "manager identity: keeping the staged file set (按「升級 Magisk 版本」才會重新提取)"
 fi
 MANAGER_INSTALLED_NEW=0
 

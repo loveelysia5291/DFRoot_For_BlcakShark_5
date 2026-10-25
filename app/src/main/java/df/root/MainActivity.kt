@@ -82,6 +82,16 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
                 ),
                 onLaunchRoot = { startRoot() },
                 onOpenMagisk = { ExploitRunner.openManager(this, this) },
+                onUpgradeMagisk = {
+                    // Only a confirmed "升級 Magisk 版本" may re-extract from the
+                    // installed manager APK; ExploitRunner turns this into
+                    // upgrade.request on the next run.
+                    getSharedPreferences(ExploitRunner.PREFS_NAME, MODE_PRIVATE)
+                        .edit()
+                        .putBoolean(ExploitRunner.PREF_UPGRADE_MAGISK, true)
+                        .apply()
+                    startRoot()
+                },
                 onSaveLog = { saveLogToDownloads() },
                 onClearLog = {
                     logBuilder.setLength(0)
@@ -164,6 +174,9 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
         hooked = File("/proc/dfroot_su").exists()
         rooted = ExploitRunner.isDeployedThisBoot()
         managerAvailable = ExploitRunner.managerPackage() != null
+        // A successful deploy survives until the next boot, so the bar must not
+        // fall back to 0% when the app is reopened.
+        if (rooted) progress = 1f
         if (running || keepStatus) return
         status = when {
             hooked -> "Hook 運作中（部署進行中）"

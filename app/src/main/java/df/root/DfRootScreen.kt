@@ -29,6 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
@@ -52,6 +54,7 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -87,6 +90,7 @@ fun DfRootApp(
     state: DfRootUiState,
     onLaunchRoot: () -> Unit,
     onOpenMagisk: () -> Unit,
+    onUpgradeMagisk: () -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
 ) {
@@ -103,6 +107,7 @@ fun DfRootApp(
             state = state,
             onLaunchRoot = onLaunchRoot,
             onOpenMagisk = onOpenMagisk,
+            onUpgradeMagisk = onUpgradeMagisk,
             onSaveLog = onSaveLog,
             onClearLog = onClearLog,
         )
@@ -122,6 +127,7 @@ private fun DfRootContent(
     state: DfRootUiState,
     onLaunchRoot: () -> Unit,
     onOpenMagisk: () -> Unit,
+    onUpgradeMagisk: () -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
 ) {
@@ -195,6 +201,7 @@ private fun DfRootContent(
                     state = state,
                     onLaunchRoot = onLaunchRoot,
                     onOpenMagisk = onOpenMagisk,
+            onUpgradeMagisk = onUpgradeMagisk,
                     onOpenSettings = { go(2) },
                 )
 
@@ -216,9 +223,11 @@ private fun HomeScreen(
     state: DfRootUiState,
     onLaunchRoot: () -> Unit,
     onOpenMagisk: () -> Unit,
+    onUpgradeMagisk: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     val colors = MiuixTheme.colorScheme
+    var showUpgrade by remember { mutableStateOf(false) }
 
     // The runner reports integer steps; interpolating between them keeps the
     // bar from jumping.
@@ -316,6 +325,16 @@ private fun HomeScreen(
 
         Card {
             Column(modifier = Modifier.fillMaxWidth()) {
+                // Same row style as 設定 / 檢視紀錄, above 設定. The deploy no
+                // longer hashes the manager APK, so this is the only way to
+                // refresh the staged Magisk file set.
+                ActionRow(
+                    icon = DfIcons.Refresh,
+                    title = "升級 Magisk 版本",
+                    summary = "從目前已安裝的 Magisk APK 重新提取檔案",
+                    onClick = { showUpgrade = true },
+                )
+                HorizontalDivider()
                 ActionRow(
                     icon = DfIcons.Settings,
                     title = "設定",
@@ -329,6 +348,37 @@ private fun HomeScreen(
                     summary = "左滑或點下方「紀錄」查看注入輸出",
                     onClick = {},
                 )
+            }
+        }
+
+        if (showUpgrade) {
+            OverlayDialog(
+                show = true,
+                title = "確認升級 Magisk 版本？",
+                summary = "會重新讀取目前已安裝的 Magisk APK，把它裡面的 magisk／magiskinit／"
+                    + "magiskpolicy 等檔案換成該版本，並重新比對簽章。\n\n"
+                    + "簽章不一致時流程與原本相同：不卸載、不重裝管理器，"
+                    + "只更新 /data/adb/magisk 的檔案。\n\n"
+                    + "按「確定」後會立刻開始部署。",
+                onDismissRequest = { showUpgrade = false },
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(text = "取消", onClick = { showUpgrade = false })
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        text = "確定",
+                        onClick = {
+                            showUpgrade = false
+                            onUpgradeMagisk()
+                        },
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                    )
+                }
             }
         }
 
