@@ -1,5 +1,7 @@
 name: Build
 
+# One job, one command: ./gradlew :app:assembleSlim.
+# A tag (v4.9.0, ...) also publishes the APK as a GitHub Release asset.
 on:
   push:
     branches: [master, main]
@@ -8,102 +10,77 @@ on:
     branches: [master, main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-lkms:
-    name: LKMs / ${{ matrix.kmi }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        kmi:
-          - android12-5.10
-          - android13-5.10
-          - android13-5.15
-          - android14-5.15
-          - android14-6.1
-          - android15-6.6
-          - android16-6.12
-          - android17-6.18
-    container:
-      image: ghcr.io/ylarod/ddk-min:${{ matrix.kmi }}-20260828
-      options: --privileged
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Build dfroot.ko
-        run: |
-          cd lkm
-          make -j$(nproc)
-          llvm-objcopy --strip-unneeded \
-            -R .comment -R .note.gnu.build-id -R .note.gnu.property \
-            -R .note.Linux -R .note.GNU-stack \
-            -R .BTF -R .BTF.base -R .llvm_addrsig \
-            -R .hyp.text -R .hyp.bss -R .hyp.rodata -R .hyp.event_ids \
-            -R .hyp.patchable_function_entries -R .hyp.data dfroot.ko
-          mkdir -p $GITHUB_WORKSPACE/out
-          cp dfroot.ko $GITHUB_WORKSPACE/out/dfroot-${{ matrix.kmi }}.ko
-          make clean
-
-      - name: Upload dfroot.ko
-        uses: actions/upload-artifact@v7
-        with:
-          name: df-lkm-${{ matrix.kmi }}
-          path: out/dfroot-${{ matrix.kmi }}.ko
-
-  build-dfroot:
-    needs: build-lkms
+  slim:
+    name: assembleSlim
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - name: Validate signing config
-        if: github.event_name != 'pull_request'
-        run: |
-          if [ "${{ secrets.KEYSTORE }}" = "" ]; then
-            echo "::error::Signing secrets not configured. KEYSTORE secret is required for release builds."
-            exit 1
-          fi
-
-      - name: Create signing.properties
-        if: github.event_name != 'pull_request'
-        run: |
-          echo KEYSTORE_FILE=../keystore.jks > signing.properties
-          echo KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} >> signing.properties
-          echo KEY_ALIAS=${{ secrets.KEY_ALIAS }} >> signing.properties
-          echo KEY_PASSWORD=${{ secrets.KEY_PASSWORD }} >> signing.properties
-          echo ${{ secrets.KEYSTORE }} | base64 --decode > keystore.jks
-
-      - name: Download DF LKMs
-        uses: actions/download-artifact@v7
-        with:
-          pattern: df-lkm-*
-          merge-multiple: true
-          path: app/src/main/jni/ko/
-
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build DFRoot APK
+      # compileSdk is 37; the runner image usually lags one platform behind.
+      - name: Install Android SDK 37
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ./gradlew :app:assembleDebug
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-37" "build-tools;37.0.0" || true
+
+      # The slim build is signed with the committed keystore/debug.keystore, so
+      # no secret is needed and the APK installs as an update over earlier
+      # DFRoot builds. If you later switch the slim signingConfig to "release",
+      # add KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD as
+      # repository secrets and this step turns them into signing.properties.
+      - name: Signing
+        env:
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "${KEYSTORE_PASSWORD}" ]; then
+            {
+              echo "KEYSTORE_FILE=${KEYSTORE_FILE}"
+              echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}"
+              echo "KEY_ALIAS=${KEY_ALIAS}"
+              echo "KEY_PASSWORD=${KEY_PASSWORD}"
+            } > signing.properties
+            echo "signing.properties written from secrets"
           else
-            ./gradlew :app:assembleRelease
+            echo "no signing secrets: assembleSlim uses keystore/debug.keystore"
           fi
 
-      - name: Upload DFRoot APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: DFRoot
-          path: |
-            app/build/outputs/apk/release/DFRoot_*.apk
-            app/build/outputs/apk/debug/DFRoot_*.apk
+      - name: Build DFRoot (slim)
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleSlim --no-daemon --stacktrace
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+      - name: Show APK
+        run: |
+          ls -l app/build/outputs/apk/slim/
+          sha256sum app/build/outputs/apk/slim/DFRoot_*.apk
+
+      - uses: actions/upload-artifact@v4
         with:
-          files: app/build/outputs/apk/release/DFRoot_*.apk
+          name: DFRoot-slim
+          path: app/build/outputs/apk/slim/DFRoot_*.apk
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/slim/DFRoot_*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true
