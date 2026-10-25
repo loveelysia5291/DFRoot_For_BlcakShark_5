@@ -1,8 +1,5 @@
 package df.root
 
-import android.content.ComponentName
-import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -35,20 +32,6 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
     private val mMain = Handler(Looper.getMainLooper())
     private val mExec: Executor = Executors.newSingleThreadExecutor()
 
-    /**
-     * Launcher entries, in the order of [PLATE_HUES]. Exactly one is enabled at
-     * any time; see the activity-alias block in AndroidManifest.xml.
-     */
-    private val monetAliases = arrayOf(
-        ".LcGreen", ".LcBlue", ".LcPurple", ".LcPink", ".LcOrange", ".LcTeal",
-    )
-
-    /**
-     * Hue of each plate: green, blue, purple, pink, orange, teal. The app can
-     * only pick a prebuilt plate (an installed icon cannot be recoloured), so
-     * the closest hue to the system accent wins.
-     */
-    private val plateHues = floatArrayOf(140f, 218f, 262f, 340f, 30f, 186f)
 
     /* ------------------------------------------------------------- state --- */
 
@@ -66,7 +49,6 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        applyMonetIcon()
         updateRunButton()
 
         setContent {
@@ -186,80 +168,6 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
         }
     }
 
-    /* ------------------------------------------------------ monet icon ---- */
-
-    /**
-     * Picks the launcher plate whose hue is closest to the system accent, so
-     * the icon follows the wallpaper palette (Monet) like the in-app theme.
-     *
-     * The choice is cached: switching launcher entries makes the launcher
-     * re-read the icon, so it only happens when the accent really changed.
-     */
-    private fun applyMonetIcon() {
-        val accent = try {
-            getColor(android.R.color.system_accent1_500)
-        } catch (e: Exception) {
-            Log.w(TAG, "no system accent colour: $e")
-            return
-        }
-        val hsv = FloatArray(3)
-        Color.colorToHSV(accent, hsv)
-        val hue = hsv[0]
-
-        var best = 0
-        var bestDistance = 361f
-        for (i in plateHues.indices) {
-            val raw = kotlin.math.abs(hue - plateHues[i])
-            val distance = if (raw > 180f) 360f - raw else raw
-            if (distance < bestDistance) {
-                bestDistance = distance
-                best = i
-            }
-        }
-
-        val prefs = getSharedPreferences(PREFS_UI, MODE_PRIVATE)
-        // Cheap no-op guard, but the component state is the source of truth:
-        // an app update re-applies the manifest defaults (only LcGreen on)
-        // while the preference survives, which would otherwise leave the icon
-        // stuck on the default plate.
-        val alreadyRight = aliasState(best) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED &&
-            monetAliases.indices.none {
-                it != best && aliasState(it) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            }
-        if (alreadyRight && prefs.getInt(PREF_MONET_ICON, -1) == best) return
-
-        // Enable first, then disable: if the new entry cannot be enabled the
-        // old one stays and the app keeps its launcher icon.
-        if (setAlias(best, enabled = true)) {
-            for (i in monetAliases.indices) {
-                if (i != best) setAlias(i, enabled = false)
-            }
-            prefs.edit().putInt(PREF_MONET_ICON, best).apply()
-            Log.i(TAG, "launcher plate -> ${monetAliases[best]} (accent hue $hue)")
-        }
-    }
-
-    private fun aliasState(index: Int): Int = try {
-        packageManager.getComponentEnabledSetting(
-            ComponentName(packageName, packageName + monetAliases[index]),
-        )
-    } catch (e: Exception) {
-        PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
-    }
-
-    private fun setAlias(index: Int, enabled: Boolean): Boolean = try {
-        packageManager.setComponentEnabledSetting(
-            ComponentName(packageName, packageName + monetAliases[index]),
-            if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            PackageManager.DONT_KILL_APP,
-        )
-        true
-    } catch (e: Exception) {
-        Log.w(TAG, "alias ${monetAliases[index]} -> $enabled failed: $e")
-        false
-    }
-
     /* ----------------------------------------------------------- save log -- */
 
     /**
@@ -298,7 +206,5 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
 
     private companion object {
         private const val TAG = "dfroot"
-        private const val PREFS_UI = "ui"
-        private const val PREF_MONET_ICON = "monet.icon"
     }
 }

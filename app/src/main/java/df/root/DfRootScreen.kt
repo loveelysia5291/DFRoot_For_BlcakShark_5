@@ -55,9 +55,7 @@ import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 import kotlin.math.roundToInt
@@ -77,9 +75,7 @@ data class DfRootUiState(
 /**
  * Wraps the MIUIX theme and the three-page swipeable scaffold.
  *
- * The palette comes from the system's Monet roles on Android 12+, so the app
- * follows the wallpaper accent instead of a hard-coded blue. A ROM that does
- * not expose a usable palette falls back to MIUIX's default schemes.
+ * Fixed MIUIX light/dark palette; no Monet / wallpaper colour extraction.
  *
  * All durations go through Compose's animation clock, which is driven by the
  * system animator duration scale, so turning animations off in the ROM's
@@ -95,13 +91,6 @@ fun DfRootApp(
     onClearLog: () -> Unit,
 ) {
     val dark = isSystemInDarkTheme()
-    val controller = remember(dark) {
-        runCatching {
-            ThemeController(
-                colorSchemeMode = if (dark) ColorSchemeMode.MonetDark else ColorSchemeMode.MonetLight,
-            )
-        }.getOrNull()
-    }
     val content: @Composable () -> Unit = {
         DfRootContent(
             state = state,
@@ -112,14 +101,7 @@ fun DfRootApp(
             onClearLog = onClearLog,
         )
     }
-    if (controller != null) {
-        MiuixTheme(controller = controller, content = content)
-    } else {
-        MiuixTheme(
-            colors = if (dark) darkColorScheme() else lightColorScheme(),
-            content = content,
-        )
-    }
+    MiuixTheme(colors = if (dark) darkColorScheme() else lightColorScheme(), content = content)
 }
 
 @Composable

@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Monet palette "green": the launcher switches to this plate when the
-     system accent is closest to it (see MainActivity.applyMonetIcon). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
@@ -11,9 +9,9 @@
           android:type="radial"
           android:centerX="48" android:centerY="42"
           android:gradientRadius="88"
-          android:startColor="#FF2E7D46"
-          android:centerColor="#FF173F26"
-          android:endColor="#FF0A1E12" />
+          android:startColor="#FF2C6BC9"
+          android:centerColor="#FF17406F"
+          android:endColor="#FF0A1E36" />
     </aapt:attr>
   </path>
   <path
