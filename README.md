@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/icon.png" width="132" height="132" alt="DFRoot">
+</p>
+
 # DFRoot (GPL-2.0)
 
 **繁體中文**（預設） ｜ [English ↓](#english)
