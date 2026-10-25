@@ -1,0 +1,5 @@
+﻿# 你的簽章程式會讀這個檔（app/build.gradle.kts 已支援）
+KEYSTORE_FILE=keystore/release.keystore
+KEYSTORE_PASSWORD=貼上你的密碼
+KEY_ALIAS=貼上你的 alias
+KEY_PASSWORD=貼上你的密碼

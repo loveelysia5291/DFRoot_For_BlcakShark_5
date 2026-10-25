@@ -18,8 +18,8 @@ public class BootReceiver extends BroadcastReceiver implements IReporter {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (new File("/dev/df").exists()) {
-            Log.i(TAG, "boot: already hooked, skipping");
+        if (new File("/proc/dfroot_su").exists()) {
+            Log.i(TAG, "boot: already hooked (LKM active), skipping");
             return;
         }
         Log.i(TAG, "boot: " + intent.getAction());

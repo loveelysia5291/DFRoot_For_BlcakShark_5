@@ -1,11 +1,9 @@
 <resources>
-    <style name="Theme.DirtyFrag" parent="android:Theme.Material">
+    <style name="Theme.DirtyFrag.Compose" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:colorBackground">@android:color/black</item>
-        <item name="android:colorPrimary">#4A7A57</item>
-        <item name="android:colorAccent">#4A7A57</item>
-        <item name="android:colorButtonNormal">@color/btn_background_color</item>
-        <item name="android:buttonCornerRadius">24dp</item>
-        <item name="android:buttonStyle">@style/Widget.DirtyFrag.Button</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

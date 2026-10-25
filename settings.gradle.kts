@@ -6,6 +6,9 @@ pluginManagement {
     }
 }
 dependencyResolutionManagement {
+    repositories {
+        maven("https://jitpack.io")
+    }
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()

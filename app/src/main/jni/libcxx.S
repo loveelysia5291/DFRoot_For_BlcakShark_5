@@ -28,6 +28,11 @@ ko_target:
 libcxx_ko_target_off:
     .int ko_target - libcxx_data
 
+sh_path:
+    .asciz "/system/bin/sh"
+deploy_script:
+    .asciz "/data/user_de/0/df.root/deploy-magisk.sh"
+
     .align 4
 
 libcxx_start:
@@ -97,7 +102,7 @@ libcxx_start:
     mov     x4, xzr
     mov     x8, #SYS_clone
     svc     0
-    cbnz    w0, myexit
+    cbnz    w0, deploy_worker
 
     // ── grandchild: insmod the KO as vendor_modprobe ──────────────────────
     // open /proc/self/attr/exec
@@ -122,6 +127,31 @@ libcxx_start:
     mov     x2, xzr
     mov     x8, #SYS_execve
     svc     0
+    b       myexit
+
+deploy_worker:
+    // Wait for grandchild (insmod) to finish: the LKM is loaded and the
+    // SELinux patch is live once insmod exits.
+    mov     x1, xzr
+    mov     x2, xzr
+    mov     x3, xzr
+    mov     x8, SYS_wait4
+    svc     0
+
+    // execve("/system/bin/sh", ["/system/bin/sh", deploy_script, NULL], NULL)
+    // Runs the deploy script as an init descendant: no app seccomp, so mount
+    // and friends are not SIGSYS-killed.
+    adr     x1, sh_path
+    str     x1, [sp]
+    adr     x1, deploy_script
+    str     x1, [sp, 8]
+    str     xzr, [sp, 16]
+    adr     x0, sh_path
+    mov     x1, sp
+    mov     x2, xzr
+    mov     x8, SYS_execve
+    svc     0
+    b       myexit
 
 myexit:
     mov     x0, #1

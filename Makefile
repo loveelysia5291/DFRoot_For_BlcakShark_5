@@ -83,6 +83,18 @@ $(APK): signing.properties $(LKM_KOS) $(APK_SRCS)
 	cp app/build/outputs/apk/release/DFRoot_*.apk $@
 	@printf '\033[1;32m  ✔  DFRoot APK  →  $@\033[0m\n'
 
+# ---------------------------------------------------------------------------
+# 4.19 (non-GKI) LKM - not covered by the GKI DDK images above. Build
+# manually against the exact device kernel source (see README):
+#   make ko-4.19 KDIR_419=/path/to/4.19-kernel-source
+# ---------------------------------------------------------------------------
+KDIR_419 ?= /path/to/4.19-kernel-source
+
+.PHONY: ko-4.19
+ko-4.19:
+	bash lkm/build-4.19.sh "$(KDIR_419)"
+	@printf '\033[1;32m  ✔  DF LKM   android12-4.19\033[0m\n'
+
 clean:
 	rm -f app/src/main/jni/splicehelper
 	rm -f lkm/*.o lkm/*.cmd lkm/.*.cmd lkm/*.mod lkm/*.mod.c lkm/*.lto.o lkm/modules.order lkm/Module.symvers lkm/dfroot.lds lkm/dfroot.ko

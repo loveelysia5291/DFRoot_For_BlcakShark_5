@@ -1,32 +1,20 @@
-# Gradle build artifacts
-.classpath
-.project
-.settings/
+﻿build/
 .gradle/
-*.iml
-.idea/
-build/
-app/build/
-app/.cxx/
-
-# local settings
+.gradle-home/
 local.properties
+keystore/
 signing.properties
-keystore.jks
-.DS_Store
+*.apk
+*.jks
+*.keystore
+.idea/
 
-# LKM build artifacts
-lkm/*.cmd
-lkm/*.o.d
-lkm/*.o
-lkm/*.mod
-lkm/*.mod.c
-lkm/*.lto.o
-lkm/*.lds
-lkm/modules.order
-lkm/Module.symvers
-
-# Generated binaries
-out/
+# Kotlin/CMake build scratch and compiled kernel payloads (sources are tracked).
+.kotlin/
+app/.cxx/
+app/src/main/jni/ko/
 app/src/main/jni/splicehelper
-app/src/main/jni/ko/*.ko
+lkm/*.mod.c
+lkm/*.o
+lkm/*.ko
+lkm/*.symvers

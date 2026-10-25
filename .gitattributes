@@ -1,0 +1,13 @@
+# The deploy runs on the device through mksh: a single CR breaks every
+# comparison and redirect and the worker dies before it writes its log.
+# Force LF for every text file so a clone on Windows cannot corrupt them.
+* text=auto eol=lf
+*.sh text eol=lf
+*.gradle.kts text eol=lf
+*.properties text eol=lf
+*.bat text eol=crlf
+*.keystore binary
+*.jks binary
+*.apk binary
+*.so binary
+*.ko binary
