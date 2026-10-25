@@ -1,5 +1,7 @@
 # 建置與發佈
 
+[繁體中文](#建置與發佈)（預設）｜ [English ↓](#build--release-english)
+
 ## CI（GitHub Actions）
 
 `.github/workflows/build.yml` 只有一個 job、一個指令：
@@ -71,3 +73,61 @@ kernel module 的載體，APK 不需要另外放 `.ko`。
 3. 暫時把 `app/build.gradle.kts` 的 `externalNativeBuild { cmake { ... } }` 打開，
    在沒有沙箱限制的機器上跑一次 `:app:assembleSlim`，把產出的 `libdfroot.so`
    放回 `app/src/main/jniLibs/arm64-v8a/`，再關掉該區塊。
+---
+
+<a id="build--release-english"></a>
+
+<details>
+<summary><b>English</b> — click to expand</summary>
+
+## Build & Release (English)
+
+CI (`.github/workflows/build.yml`) is a single job running a single command:
+
+```sh
+./gradlew :app:assembleRelease
+```
+
+Push to `master`/`main` or open a PR → build + `DFRoot-release` artifact.
+Push a `v*` tag → the same build plus a GitHub Release with the APK attached.
+Manual `workflow_dispatch` → build + artifact.
+
+### Signing
+
+`assembleRelease` signs with `signing.properties` when the file exists **and**
+the keystore it names is really on disk; otherwise it falls back to the
+committed `keystore/debug.keystore` (`android` / `android`), so the APK stays
+installable as an update over earlier builds. On CI, put the keystore in the
+base64 secret `KEYSTORE_BASE64` (with `KEYSTORE_PASSWORD`, `KEY_ALIAS`,
+`KEY_PASSWORD`) and the workflow decodes it and writes `signing.properties`.
+
+### Local
+
+```sh
+./gradlew :app:assembleRelease  # R8 + resource shrinking, ~5 MB (same as CI)
+./gradlew :app:assembleDebug    # unminified, ~30 MB
+./gradlew :app:assembleSlim     # same as release, always the debug key
+```
+
+Requires JDK 21 and Android SDK `compileSdk 37`.
+
+### Native engine `libdfroot.so`
+
+`lib/arm64-v8a/libdfroot.so` is **prebuilt**; `build.gradle.kts` does not enable
+`externalNativeBuild`, so CI just packages it. It is produced from
+`app/src/main/jni/` (`exp.c`, `elf_parser.c`, `libcxx.S`) and `CMakeLists.txt`
+embeds `app/src/main/jni/ko/*.ko` into it — that is why the APK needs no `.ko`
+files of its own and no kernel-module matrix in CI.
+
+To regenerate it:
+
+1. Kernel modules live in `lkm/`. For 4.19 (SHARK PAR-H0) run
+   `bash lkm/build-4.19.sh <kernel-source>`; for GKI kernels use the
+   `ghcr.io/ylarod/ddk-min` containers (see `lkm/Makefile`).
+2. Drop the resulting `dfroot-<kmi>.ko` files into `app/src/main/jni/ko/`.
+3. Temporarily enable `externalNativeBuild { cmake { ... } }` in
+   `app/build.gradle.kts`, run `:app:assembleSlim` once on an unrestricted
+   machine, copy the produced `libdfroot.so` back into
+   `app/src/main/jniLibs/arm64-v8a/`, then disable the block again.
+
+</details>
