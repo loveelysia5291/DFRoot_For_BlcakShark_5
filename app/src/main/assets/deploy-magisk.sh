@@ -1412,6 +1412,17 @@ prepare_debug_ramdisk() {
     # existing namespace can resolve /debug_ramdisk/su (and /system/xbin/su).
     mount --make-rshared / 2>/dev/null
 
+    # NOTE: a directory bind on /data (f2fs) is NOT laziness - do not "improve"
+    # this into a tmpfs. mountinfo makes it the loudest fingerprint DFRoot
+    # leaves (a dm-* device where the ROM's fstab says tmpfs, reported as
+    # "inconsistent mount of /debug_ramdisk" plus several suspicious_mount
+    # entries), but a tmpfs mount is a distinct object per mount namespace:
+    # install_global_root() has to re-mount /debug_ramdisk inside init's
+    # namespace because the worker is in another one, and a tmpfs mounted here
+    # would be a different, empty filesystem there - /debug_ramdisk/su and the
+    # daemon's files would diverge and root would break. The bind is shared
+    # storage, which is exactly what is needed.
+    #
     # Always replace /debug_ramdisk with our own f2fs directory. An OEM
     # /debug_ramdisk may be a directory on another filesystem with unrelated
     # files; do not probe it and then delete its contents. The bind also makes
