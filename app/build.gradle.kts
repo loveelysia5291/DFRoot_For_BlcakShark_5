@@ -23,6 +23,13 @@ val hasReleaseSigning = listOf(
     "KEY_PASSWORD"
 ).all { key ->
     !signingProps.getProperty(key).isNullOrBlank()
+} && run {
+    // A signing.properties that points at a keystore which is not on disk (the
+    // usual case on a fresh clone, because keystore/ is gitignored) must not be
+    // treated as "release signing is configured": Gradle would fail on a
+    // missing storeFile instead of falling back to the debug key.
+    val store = signingProps.getProperty("KEYSTORE_FILE")
+    store != null && rootProject.file(store).exists()
 }
 
 android {
@@ -80,9 +87,14 @@ android {
         }
 
         release {
-            // 有提供 signing.properties 才使用 Release 簽章
-            if (hasReleaseSigning) {
-                signingConfig = signingConfigs.getByName("release")
+            // 有 signing.properties 就用你自己的 key，沒有就退回版控內的
+            // debug keystore（與舊版 DFRoot 同憑證，可直接覆蓋安裝）。
+            // 少了這個 else，assembleRelease 只會產出 app-release-unsigned.apk，
+            // 那種檔案裝不起來，CI 也沒東西可以掛上 release。
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debugLocal")
             }
 
             isMinifyEnabled = true

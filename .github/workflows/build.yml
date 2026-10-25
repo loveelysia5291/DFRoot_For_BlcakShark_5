@@ -1,6 +1,6 @@
 name: Build
 
-# One job, one command: ./gradlew :app:assembleSlim.
+# One job, one command: ./gradlew :app:assembleRelease.
 # A tag (v4.9.0, ...) also publishes the APK as a GitHub Release asset.
 on:
   push:
@@ -18,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  slim:
-    name: assembleSlim
+  release:
+    name: assembleRelease
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,50 +37,54 @@ jobs:
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platforms;android-37" "build-tools;37.0.0" || true
 
-      # The slim build is signed with the committed keystore/debug.keystore, so
-      # no secret is needed and the APK installs as an update over earlier
-      # DFRoot builds. If you later switch the slim signingConfig to "release",
-      # add KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD as
-      # repository secrets and this step turns them into signing.properties.
+      # assembleRelease signs with your key when KEYSTORE_BASE64 is set, and
+      # falls back to the committed keystore/debug.keystore otherwise, so the
+      # job produces an installable APK either way. The keystore file itself is
+      # gitignored, which is why it has to travel as a base64 secret:
+      #   base64 -w0 keystore/release.keystore
       - name: Signing
         env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -n "${KEYSTORE_PASSWORD}" ]; then
+          if [ -n "${KEYSTORE_BASE64}" ]; then
+            STORE="${KEYSTORE_FILE:-keystore/release.keystore}"
+            mkdir -p "$(dirname "$STORE")"
+            printf '%s' "${KEYSTORE_BASE64}" | base64 -d > "$STORE"
             {
-              echo "KEYSTORE_FILE=${KEYSTORE_FILE}"
+              echo "KEYSTORE_FILE=${STORE}"
               echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}"
               echo "KEY_ALIAS=${KEY_ALIAS}"
               echo "KEY_PASSWORD=${KEY_PASSWORD}"
             } > signing.properties
-            echo "signing.properties written from secrets"
+            echo "release signing: ${STORE}"
           else
-            echo "no signing secrets: assembleSlim uses keystore/debug.keystore"
+            echo "no KEYSTORE_BASE64 secret: release falls back to keystore/debug.keystore"
           fi
 
-      - name: Build DFRoot (slim)
+      - name: Build DFRoot
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleSlim --no-daemon --stacktrace
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Show APK
         run: |
-          ls -l app/build/outputs/apk/slim/
-          sha256sum app/build/outputs/apk/slim/DFRoot_*.apk
+          ls -l app/build/outputs/apk/release/
+          sha256sum app/build/outputs/apk/release/DFRoot_*.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: DFRoot-slim
-          path: app/build/outputs/apk/slim/DFRoot_*.apk
+          name: DFRoot-release
+          path: app/build/outputs/apk/release/DFRoot_*.apk
           if-no-files-found: error
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/slim/DFRoot_*.apk
+          files: app/build/outputs/apk/release/DFRoot_*.apk
           generate_release_notes: true
           fail_on_unmatched_files: true

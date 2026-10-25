@@ -5,12 +5,12 @@
 `.github/workflows/build.yml` 只有一個 job、一個指令：
 
 ```sh
-./gradlew :app:assembleSlim
+./gradlew :app:assembleRelease
 ```
 
 | 觸發 | 結果 |
 |---|---|
-| push `master` / `main` | 建置 + 上傳 artifact `DFRoot-slim` |
+| push `master` / `main` | 建置 + 上傳 artifact `DFRoot-release` |
 | PR | 同上 |
 | push tag `v*` | 建置 + 建立 GitHub Release，掛上 `DFRoot_<ver>.apk` |
 | 手動 dispatch | 建置 + artifact |
@@ -24,19 +24,32 @@ git push origin master --tags
 
 ## 簽章
 
-`assembleSlim` 用版控內的 `keystore/debug.keystore`（`storePassword`/`keyPassword`
-都是 `android`），所以 CI 不需要任何 secret，而且與舊版 DFRoot 同憑證，可直接
-覆蓋安裝。
+`assembleRelease` 的簽章來源有兩段：
 
-要換成自己的 key，在 repo secrets 設 `KEYSTORE_FILE` / `KEYSTORE_PASSWORD` /
-`KEY_ALIAS` / `KEY_PASSWORD`，workflow 會寫出 `signing.properties`；再把
-`app/build.gradle.kts` 裡 slim 的 `signingConfig` 改成 `release` 即可。
+1. `signing.properties` 存在**而且**它指向的 keystore 真的在磁碟上 → 用你的 key。
+2. 否則退回版控內的 `keystore/debug.keystore`（`storePassword` / `keyPassword`
+   都是 `android`），與舊版 DFRoot 同憑證，可直接覆蓋安裝。
+
+CI 上的 keystore 是 `keystore/` 底下的檔案（已被 gitignore），所以要用 base64
+secret 帶進去：
+
+```sh
+base64 -w0 keystore/release.keystore     # 存成 secret KEYSTORE_BASE64
+```
+
+再設 `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`（`KEYSTORE_FILE` 可省略，
+預設 `keystore/release.keystore`）。沒設 `KEYSTORE_BASE64` 就用 debug key，CI
+不會失敗。
+
+本機同理：`signing.properties` 指到不存在的 keystore 時會自動退回 debug key，
+不會像以前一樣直接讓 Gradle 掛在 `storeFile` 上。
 
 ## 本機
 
 ```sh
-./gradlew :app:assembleSlim    # R8 + 資源縮減，約 5 MB
-./gradlew :app:assembleDebug   # 不壓縮，約 30 MB
+./gradlew :app:assembleRelease  # R8 + 資源縮減，約 5 MB（CI 用這個）
+./gradlew :app:assembleDebug    # 不壓縮，約 30 MB
+./gradlew :app:assembleSlim     # 與 release 等價，固定用 debug 憑證
 ```
 
 需要 JDK 21、Android SDK `compileSdk 37`。
