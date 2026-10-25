@@ -1,9 +1,3 @@
----
-
-<a id="english"></a>
-
-<details>
-<summary><b>English</b> — click to expand</summary>
 
 # DFRoot (GPL-2.0)
 
