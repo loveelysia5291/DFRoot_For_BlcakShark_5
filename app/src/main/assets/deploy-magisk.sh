@@ -306,22 +306,7 @@ install_stock_su() {
         TEST_SU=/debug_ramdisk/su
         echo "WARN: /debug_ramdisk/su is not a Magisk symlink"
     fi
-
-    # Mount /system/xbin as tmpfs and create standard su/magisk links for all apps
-    mount_xbin
-    if [ "$XBIN_OK" = "1" ]; then
-        ln -sf /debug_ramdisk/magisk /system/xbin/su
-        ln -sf /debug_ramdisk/magisk /system/xbin/magisk
-        chmod 755 /system/xbin/su /system/xbin/magisk 2>/dev/null
-        chcon "$MAGISK_FILE_CON" /system/xbin/su 2>/dev/null
-        chcon "$MAGISK_FILE_CON" /system/xbin/magisk 2>/dev/null
-        chcon -h "$MAGISK_FILE_CON" /system/xbin/su 2>/dev/null
-        chcon -h "$MAGISK_FILE_CON" /system/xbin/magisk 2>/dev/null
-        echo "xbin su symlinks created in /system/xbin"
-    fi
-    if [ -e /system/bin/su ]; then
-        mount --bind /debug_ramdisk/su /system/bin/su 2>/dev/null
-    fi
+    XBIN_OK=0
 }
 
 lsposed_module_enabled() {
@@ -1261,7 +1246,13 @@ prepare_debug_ramdisk() {
     rm -rf /debug_ramdisk/.magisk/pts 2>/dev/null
     rm -f /debug_ramdisk/.magisk/block/preinit /debug_ramdisk/.magisk/device/preinit 2>/dev/null
     PREINIT_DEV=""
-    for _blk in /dev/block/loop0 /dev/block/loop1 /dev/block/by-name/boot /dev/block/bootdevice/by-name/boot; do
+    for _blk in /dev/block/bootdevice/by-name/boot \
+                /dev/block/by-name/boot \
+                /dev/block/platform/*/by-name/boot \
+                /dev/block/sda \
+                /dev/block/sde \
+                /dev/block/loop0 \
+                /dev/block/loop1; do
         if [ -b "$_blk" ]; then
             PREINIT_DEV="$_blk"
             break
@@ -1276,15 +1267,17 @@ prepare_debug_ramdisk() {
         done
     fi
     if [ -n "$PREINIT_DEV" ]; then
-        touch /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+        ln -sf "$PREINIT_DEV" /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+        ln -sf "$PREINIT_DEV" /debug_ramdisk/.magisk/device/preinit 2>/dev/null
         mount --bind "$PREINIT_DEV" /debug_ramdisk/.magisk/block/preinit 2>/dev/null
-        touch /debug_ramdisk/.magisk/device/preinit 2>/dev/null
         mount --bind "$PREINIT_DEV" /debug_ramdisk/.magisk/device/preinit 2>/dev/null
-    else
-        mknod /debug_ramdisk/.magisk/block/preinit b 7 0 2>/dev/null || touch /debug_ramdisk/.magisk/block/preinit
-        mknod /debug_ramdisk/.magisk/device/preinit b 7 0 2>/dev/null || touch /debug_ramdisk/.magisk/device/preinit
     fi
-    chmod 644 /debug_ramdisk/.magisk/block/preinit /debug_ramdisk/.magisk/device/preinit 2>/dev/null
+    if [ ! -b /debug_ramdisk/.magisk/device/preinit ]; then
+        mknod /debug_ramdisk/.magisk/block/preinit b 7 0 2>/dev/null
+        mknod /debug_ramdisk/.magisk/device/preinit b 7 0 2>/dev/null
+    fi
+    chmod 666 /debug_ramdisk/.magisk/block/preinit /debug_ramdisk/.magisk/device/preinit 2>/dev/null
+    chcon -h "$MAGISK_FILE_CON" /debug_ramdisk/.magisk/block/preinit /debug_ramdisk/.magisk/device/preinit 2>/dev/null
     chcon "$MAGISK_FILE_CON" /debug_ramdisk/.magisk/block/preinit /debug_ramdisk/.magisk/device/preinit 2>/dev/null
 
     if ! debug_ramdisk_xattr_ok; then
@@ -1992,11 +1985,21 @@ for i in 1 2 3 4 5; do
 done
 
 _DPL_VER=$($BB timeout 5 "$SQLBIN" -V 2>&1 | $BB head -1 | $BB tr -dc '0-9')
+_DPL_VER_STR=$($BB timeout 5 "$SQLBIN" -v 2>&1 | $BB head -1 | $BB awk '{print $1}')
 if [ -n "$_DPL_VER" ]; then
     printf 'Magisk %s\n' "$_DPL_VER" > "$SUDIR/deployed.version" 2>/dev/null
     _dv_uid=$(pkg_uid df.root 2>/dev/null)
     [ -n "$_dv_uid" ] && chown "$_dv_uid:$_dv_uid" "$SUDIR/deployed.version" 2>/dev/null
+    if [ -f "$DATABIN/util_functions.sh" ]; then
+        $BB sed -i "s/^MAGISK_VER_CODE=.*/MAGISK_VER_CODE=$_DPL_VER/" "$DATABIN/util_functions.sh" 2>/dev/null
+    fi
 fi
+if [ -n "$_DPL_VER_STR" ] && [ -f "$DATABIN/util_functions.sh" ]; then
+    $BB sed -i "s/^MAGISK_VER=.*/MAGISK_VER='$_DPL_VER_STR'/" "$DATABIN/util_functions.sh" 2>/dev/null
+fi
+
+chmod 755 /debug_ramdisk /debug_ramdisk/.magisk /debug_ramdisk/.magisk/device 2>/dev/null
+chmod 666 /debug_ramdisk/.magisk/device/socket 2>/dev/null
 
 if [ -n "$MGR_PKG" ]; then
     sql_run "INSERT OR REPLACE INTO strings (key,value) VALUES ('requester','$MGR_PKG');" >/dev/null 2>&1
@@ -2005,6 +2008,22 @@ fi
 
 if [ -n "$MGR_UID" ]; then
     sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($MGR_UID,2,0,1,0);" >/dev/null 2>&1
+fi
+
+# Pre-grant shell (UID 2000 / ADB) and DFRoot
+sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES (2000,2,0,1,0);" >/dev/null 2>&1
+_df_uid=$(pkg_uid df.root 2>/dev/null)
+[ -n "$_df_uid" ] && sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($_df_uid,2,0,1,0);" >/dev/null 2>&1
+
+# Pre-grant installed root utilities (e.g. Shizuku, MT Manager, Termux)
+if [ -s "$PKGLIST" ]; then
+    for _target_pkg in moe.shizuku.privileged.api bin.mt.plus com.termux io.github.vvb2060.magisk; do
+        _puid=$(pkg_uid "$_target_pkg" 2>/dev/null)
+        if [ -n "$_puid" ]; then
+            sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($_puid,2,0,1,1);" >/dev/null 2>&1
+            echo "granted root policy for $_target_pkg (uid $_puid)"
+        fi
+    done
 fi
 
 policy_rows > "$POL_SNAPSHOT"
@@ -2024,6 +2043,16 @@ sleep 1
 POL_CURRENT=$SUDIR/policies.after
 policy_rows > "$POL_CURRENT"
 restore_missing_policies "$POL_CURRENT"
+
+# Ensure policies are preserved for target root apps
+if [ -s "$PKGLIST" ]; then
+    for _target_pkg in moe.shizuku.privileged.api bin.mt.plus com.termux io.github.vvb2060.magisk; do
+        _puid=$(pkg_uid "$_target_pkg" 2>/dev/null)
+        if [ -n "$_puid" ]; then
+            sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($_puid,2,0,1,1);" >/dev/null 2>&1
+        fi
+    done
+fi
 
 install_stock_su
 
