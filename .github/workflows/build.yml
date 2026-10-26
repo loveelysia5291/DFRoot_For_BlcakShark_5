@@ -97,19 +97,18 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: DFRoot ${{ steps.ver.outputs.version }}
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: DFRoot_For_BlcakShark_5 v${{ steps.ver.outputs.version }}
           body: |
-            DFRoot ${{ steps.ver.outputs.version }}
+            DFRoot_For_BlcakShark_5 ${{ steps.ver.outputs.version }}
 
-            Android 12 / kernel 4.19 臨時 root 注入工具（Magisk）。
+            DFRoot_For_BlcakShark_5 ${{ steps.ver.outputs.version }}
 
-            - 安裝前請先安裝 Magisk，本工具不會幫你安裝或卸載管理器
-            - 部署時直接讀取已安裝管理器的 APK 取出檔案，不需要匯入
-            - su 只存在於 `/debug_ramdisk/su`
-            - arm64-v8a，單一 APK
-
-            簽章：`keystore/debug.keystore`（與舊版 DFRoot 相同，可直接覆蓋安裝）
+            該版本只支援Magisk 31.1以上版本
+            系統版本:JOYUI13 22.06.20
+            核心版本:4.19.113-perf-g957c7e270183
+            版本號碼:PTRT2206200OS00MP1  
+            
           files: ${{ steps.ver.outputs.apk }}
           fail_on_unmatched_files: true
           make_latest: true
