@@ -1209,7 +1209,7 @@ soft_reboot_lsposed() {
         LSPOSED_RESULT=partial
     fi
     return 0
-}
+
 
 debug_ramdisk_xattr_ok() {
     _probe=/debug_ramdisk/.dfroot_xattr_probe
