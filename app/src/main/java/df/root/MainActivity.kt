@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
                         .apply()
                     startRoot()
                 },
+                onOpenRecords = { },
                 onSaveLog = { saveLogToDownloads() },
                 onClearLog = {
                     logBuilder.setLength(0)

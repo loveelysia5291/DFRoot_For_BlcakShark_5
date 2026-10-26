@@ -87,6 +87,7 @@ fun DfRootApp(
     onLaunchRoot: () -> Unit,
     onOpenMagisk: () -> Unit,
     onUpgradeMagisk: () -> Unit,
+    onOpenRecords: () -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
 ) {
@@ -97,6 +98,7 @@ fun DfRootApp(
             onLaunchRoot = onLaunchRoot,
             onOpenMagisk = onOpenMagisk,
             onUpgradeMagisk = onUpgradeMagisk,
+            onOpenRecords = onOpenRecords,
             onSaveLog = onSaveLog,
             onClearLog = onClearLog,
         )
@@ -110,6 +112,7 @@ private fun DfRootContent(
     onLaunchRoot: () -> Unit,
     onOpenMagisk: () -> Unit,
     onUpgradeMagisk: () -> Unit,
+    onOpenRecords: () -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
 ) {
@@ -184,6 +187,7 @@ private fun DfRootContent(
                     onLaunchRoot = onLaunchRoot,
                     onOpenMagisk = onOpenMagisk,
             onUpgradeMagisk = onUpgradeMagisk,
+            onOpenRecords = onOpenRecords,
                     onOpenSettings = { go(2) },
                 )
 
@@ -207,6 +211,7 @@ private fun HomeScreen(
     onOpenMagisk: () -> Unit,
     onUpgradeMagisk: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenRecords: () -> Unit,
 ) {
     val colors = MiuixTheme.colorScheme
     var showUpgrade by remember { mutableStateOf(false) }
@@ -278,7 +283,7 @@ private fun HomeScreen(
 
         Button(
             onClick = onLaunchRoot,
-            enabled = !state.running && !state.hooked,
+            enabled = !state.running && !state.hooked && !state.rooted,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -327,8 +332,8 @@ private fun HomeScreen(
                 ActionRow(
                     icon = DfIcons.Records,
                     title = "檢視紀錄",
-                    summary = "左滑或點下方「紀錄」查看注入輸出",
-                    onClick = {},
+                    summary = "查看注入輸出、可存到 Download",
+                    onClick = onOpenRecords,
                 )
             }
         }
