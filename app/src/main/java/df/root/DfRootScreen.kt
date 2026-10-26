@@ -11,7 +11,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -240,152 +242,164 @@ private fun HomeScreen(
 
     val rootButtonEnabled = !state.running && !state.hooked && !state.rooted
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize(),
     ) {
-        // Status row & percentage
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
+        val availableHeight = maxHeight
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (isSuccess) {
-                Icon(
-                    imageVector = DfIcons.Check,
-                    contentDescription = "成功",
-                    modifier = Modifier.size(24.dp),
-                    tint = Color(0xFF4CAF50),
-                )
-            } else if (isFailed) {
-                Icon(
-                    imageVector = DfIcons.Close,
-                    contentDescription = "失敗",
-                    modifier = Modifier.size(24.dp),
-                    tint = Color(0xFFE53935),
-                )
-            }
-            AnimatedContent(
-                targetState = headlineText,
-                transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
-                label = "headline",
-            ) { text ->
+            // Status row & percentage
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isSuccess) {
+                    Icon(
+                        imageVector = DfIcons.Check,
+                        contentDescription = "成功",
+                        modifier = Modifier.size(24.dp),
+                        tint = Color(0xFF4CAF50),
+                    )
+                } else if (isFailed) {
+                    Icon(
+                        imageVector = DfIcons.Close,
+                        contentDescription = "失敗",
+                        modifier = Modifier.size(24.dp),
+                        tint = Color(0xFFE53935),
+                    )
+                }
+                AnimatedContent(
+                    targetState = headlineText,
+                    transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
+                    label = "headline",
+                ) { text ->
+                    Text(
+                        text = text,
+                        style = MiuixTheme.textStyles.title3,
+                        color = statusColor,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
                 Text(
-                    text = text,
-                    style = MiuixTheme.textStyles.title3,
+                    text = "${(progress * 100f).roundToInt()}%",
+                    style = MiuixTheme.textStyles.body2,
                     color = statusColor,
                 )
             }
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = "${(progress * 100f).roundToInt()}%",
-                style = MiuixTheme.textStyles.body2,
-                color = statusColor,
+
+            // Progress bar
+            LinearProgressIndicator(
+                progress = progress,
+                colors = progressColors,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp),
             )
-        }
 
-        // Progress bar
-        LinearProgressIndicator(
-            progress = progress,
-            colors = progressColors,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp),
-        )
+            // Status text
+            Text(
+                text = state.status,
+                style = MiuixTheme.textStyles.footnote1,
+                color = colors.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
 
-        // Status text
-        Text(
-            text = state.status,
-            style = MiuixTheme.textStyles.footnote1,
-            color = colors.onSurfaceVariantSummary,
-            maxLines = 1,
-        )
-
-        // Primary action buttons: 啟動 Root & 開啟 Magisk
-        if (state.managerAvailable) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            // Primary action buttons: 啟動 Root & 開啟 Magisk
+            if (state.managerAvailable) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = onLaunchRoot,
+                        enabled = rootButtonEnabled,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                    ) {
+                        Text(
+                            text = when {
+                                state.running -> "部署中…"
+                                state.rooted -> "已 Root"
+                                else -> "啟動 Root"
+                            },
+                            style = MiuixTheme.textStyles.button,
+                            maxLines = 1,
+                        )
+                    }
+                    Button(
+                        onClick = onOpenMagisk,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Text("開啟 Magisk", style = MiuixTheme.textStyles.button, maxLines = 1)
+                    }
+                }
+            } else {
                 Button(
                     onClick = onLaunchRoot,
                     enabled = rootButtonEnabled,
                     modifier = Modifier
-                        .weight(1f)
-                        .height(42.dp),
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                     colors = ButtonDefaults.buttonColorsPrimary(),
                 ) {
                     Text(
                         text = when {
                             state.running -> "部署中…"
-                            state.rooted -> "已 Root"
+                            state.rooted -> "已於本次開機 Root"
                             else -> "啟動 Root"
                         },
                         style = MiuixTheme.textStyles.button,
+                        maxLines = 1,
                     )
                 }
+            }
+
+            // Import & Upgrade in ONE Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Button(
-                    onClick = onOpenMagisk,
+                    onClick = onImportMagisk,
+                    enabled = !state.running,
                     modifier = Modifier
                         .weight(1f)
-                        .height(42.dp),
+                        .height(46.dp),
+                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                 ) {
-                    Text("開啟 Magisk", style = MiuixTheme.textStyles.button)
+                    Text("導入 APK", style = MiuixTheme.textStyles.button, maxLines = 1)
+                }
+                Button(
+                    onClick = { showUpgrade = true },
+                    enabled = !state.running,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
+                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Text("升級 Magisk", style = MiuixTheme.textStyles.button, maxLines = 1)
                 }
             }
-        } else {
-            Button(
-                onClick = onLaunchRoot,
-                enabled = rootButtonEnabled,
+
+            // Realtime log Card - 約佔畫面的一半 (~48%)
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp),
-                colors = ButtonDefaults.buttonColorsPrimary(),
+                    .height((availableHeight * 0.48f).coerceAtLeast(200.dp)),
             ) {
-                Text(
-                    text = when {
-                        state.running -> "部署中…"
-                        state.rooted -> "已於本次開機 Root"
-                        else -> "啟動 Root"
-                    },
-                    style = MiuixTheme.textStyles.button,
-                )
-            }
-        }
-
-        // Import & Upgrade in ONE Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(
-                onClick = onImportMagisk,
-                enabled = !state.running,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(38.dp),
-            ) {
-                Text("導入 APK", style = MiuixTheme.textStyles.button)
-            }
-            Button(
-                onClick = { showUpgrade = true },
-                enabled = !state.running,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(38.dp),
-            ) {
-                Text("升級 Magisk", style = MiuixTheme.textStyles.button)
-            }
-        }
-
-        // Realtime log Card - fill remaining vertical space (.weight(1f))
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -481,6 +495,8 @@ private fun HomeScreen(
             }
         }
 
+        Spacer(Modifier.weight(1f))
+
         Text(
             text = "DFRoot ${BuildConfig.VERSION_NAME} · 核心 " +
                 System.getProperty("os.version", "?"),
@@ -492,4 +508,5 @@ private fun HomeScreen(
             textAlign = TextAlign.Center,
         )
     }
+}
 }
