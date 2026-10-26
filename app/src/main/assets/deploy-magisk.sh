@@ -1241,6 +1241,15 @@ prepare_debug_ramdisk() {
     chmod 755 /debug_ramdisk 2>/dev/null
     chcon "$MAGISK_FILE_CON" /debug_ramdisk 2>/dev/null
     rm -rf /debug_ramdisk/.magisk/pts 2>/dev/null
+    rm -f /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+    if [ -b /dev/block/loop0 ]; then
+        touch /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+        mount --bind /dev/block/loop0 /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+    else
+        mknod /debug_ramdisk/.magisk/block/preinit b 7 0 2>/dev/null || touch /debug_ramdisk/.magisk/block/preinit
+    fi
+    chmod 600 /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+
     if ! debug_ramdisk_xattr_ok; then
         return 1
     fi
