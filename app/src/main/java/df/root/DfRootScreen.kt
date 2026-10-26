@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,12 +18,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -36,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,6 +52,7 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -221,19 +226,47 @@ private fun HomeScreen(
     val colors = MiuixTheme.colorScheme
     var showUpgrade by remember { mutableStateOf(false) }
 
-    // The runner reports integer steps; interpolating between them keeps the
-    // bar from jumping.
+    val isSuccess = state.rooted
+    val isFailed = !state.running && !state.hooked && !state.rooted &&
+            (state.status.contains("失敗") || state.status.contains("failed") || state.status.contains("錯誤"))
+
+    val targetProgress = when {
+        isSuccess -> 1f
+        isFailed -> state.progress.coerceAtLeast(0.05f)
+        else -> state.progress
+    }
+
     val progress by animateFloatAsState(
-        targetValue = state.progress,
+        targetValue = targetProgress,
         animationSpec = tween(durationMillis = 320),
         label = "deploy-progress",
     )
 
-    val headline = when {
-        state.rooted -> "已取得 Root"
+    val headlineText = when {
+        isSuccess -> "注入成功"
+        isFailed -> "注入失敗"
         state.hooked -> "部署進行中"
         state.running -> "部署中"
         else -> "尚未部署"
+    }
+
+    val statusColor = when {
+        isSuccess -> Color(0xFF4CAF50)
+        isFailed -> Color(0xFFE53935)
+        state.running || state.hooked -> colors.primary
+        else -> colors.onSurface
+    }
+
+    val progressColors = when {
+        isSuccess -> ProgressIndicatorDefaults.progressIndicatorColors(
+            foregroundColor = Color(0xFF4CAF50),
+        )
+        isFailed -> ProgressIndicatorDefaults.progressIndicatorColors(
+            foregroundColor = Color(0xFFE53935),
+        )
+        else -> ProgressIndicatorDefaults.progressIndicatorColors(
+            foregroundColor = colors.primary,
+        )
     }
 
     Column(
@@ -243,16 +276,36 @@ private fun HomeScreen(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AnimatedContent(
-            targetState = headline,
-            transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
-            label = "headline",
-        ) { text ->
-            Text(
-                text = text,
-                style = MiuixTheme.textStyles.title2,
-                color = if (state.running || state.hooked) colors.primary else colors.onSurface,
-            )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (isSuccess) {
+                Icon(
+                    imageVector = DfIcons.Check,
+                    contentDescription = "成功",
+                    modifier = Modifier.size(28.dp),
+                    tint = Color(0xFF4CAF50),
+                )
+            } else if (isFailed) {
+                Icon(
+                    imageVector = DfIcons.Close,
+                    contentDescription = "失敗",
+                    modifier = Modifier.size(28.dp),
+                    tint = Color(0xFFE53935),
+                )
+            }
+            AnimatedContent(
+                targetState = headlineText,
+                transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                label = "headline",
+            ) { text ->
+                Text(
+                    text = text,
+                    style = MiuixTheme.textStyles.title2,
+                    color = statusColor,
+                )
+            }
         }
         Text(
             text = state.status,
@@ -275,12 +328,13 @@ private fun HomeScreen(
                     Text(
                         text = "${(progress * 100f).roundToInt()}%",
                         style = MiuixTheme.textStyles.body1,
-                        color = colors.primary,
+                        color = statusColor,
                     )
                 }
                 Spacer(Modifier.height(10.dp))
                 LinearProgressIndicator(
                     progress = progress,
+                    colors = progressColors,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -349,6 +403,56 @@ private fun HomeScreen(
                     summary = "查看注入輸出、可存到 Download",
                     onClick = onOpenRecords,
                 )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "即時執行日誌",
+                        style = MiuixTheme.textStyles.title4,
+                    )
+                    Text(
+                        text = "切換至紀錄頁 ➔",
+                        style = MiuixTheme.textStyles.body2,
+                        color = colors.primary,
+                        modifier = Modifier.clickable { onOpenRecords() },
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 260.dp)
+                        .background(
+                            color = if (isSystemInDarkTheme()) Color(0xFF1E1E1E) else Color(0xFFF5F5F5),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(10.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    SelectionContainer {
+                        Text(
+                            text = state.output.ifBlank { "尚未有執行日誌…" },
+                            style = MiuixTheme.textStyles.body2.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                            ),
+                            color = if (state.output.isBlank()) colors.onSurfaceVariantSummary else colors.onSurface,
+                        )
+                    }
+                }
             }
         }
 

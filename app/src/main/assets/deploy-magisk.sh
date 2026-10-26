@@ -282,7 +282,6 @@ install_stock_su() {
     rm -f /system/xbin/su /system/xbin/magisk 2>/dev/null
     rm -f /system/bin/su /system/bin/magisk 2>/dev/null
     rm -f /system/sbin/su 2>/dev/null
-    echo "su installed: /debug_ramdisk/su only (xbin/bin cleaned)"
 
     rm -f /debug_ramdisk/su 2>/dev/null
     ln -sf /debug_ramdisk/magisk /debug_ramdisk/su
@@ -292,6 +291,10 @@ install_stock_su() {
     chcon -h "$MAGISK_FILE_CON" /debug_ramdisk/su 2>/dev/null
     chcon "$MAGISK_FILE_CON" /debug_ramdisk 2>/dev/null
     chcon -R "$MAGISK_FILE_CON" /debug_ramdisk/.magisk 2>/dev/null
+    chmod 755 /debug_ramdisk 2>/dev/null
+    chmod 755 /debug_ramdisk/.magisk 2>/dev/null
+    chmod 755 /debug_ramdisk/.magisk/device 2>/dev/null
+    chmod 666 /debug_ramdisk/.magisk/device/socket 2>/dev/null
     echo "debug_ramdisk su: $(ls -l /debug_ramdisk/su 2>&1)"
 
     SU_LINKS_OK=0
@@ -303,7 +306,22 @@ install_stock_su() {
         TEST_SU=/debug_ramdisk/su
         echo "WARN: /debug_ramdisk/su is not a Magisk symlink"
     fi
-    XBIN_OK=0
+
+    # Mount /system/xbin as tmpfs and create standard su/magisk links for all apps
+    mount_xbin
+    if [ "$XBIN_OK" = "1" ]; then
+        ln -sf /debug_ramdisk/magisk /system/xbin/su
+        ln -sf /debug_ramdisk/magisk /system/xbin/magisk
+        chmod 755 /system/xbin/su /system/xbin/magisk 2>/dev/null
+        chcon "$MAGISK_FILE_CON" /system/xbin/su 2>/dev/null
+        chcon "$MAGISK_FILE_CON" /system/xbin/magisk 2>/dev/null
+        chcon -h "$MAGISK_FILE_CON" /system/xbin/su 2>/dev/null
+        chcon -h "$MAGISK_FILE_CON" /system/xbin/magisk 2>/dev/null
+        echo "xbin su symlinks created in /system/xbin"
+    fi
+    if [ -e /system/bin/su ]; then
+        mount --bind /debug_ramdisk/su /system/bin/su 2>/dev/null
+    fi
 }
 
 lsposed_module_enabled() {
@@ -1241,14 +1259,33 @@ prepare_debug_ramdisk() {
     chmod 755 /debug_ramdisk 2>/dev/null
     chcon "$MAGISK_FILE_CON" /debug_ramdisk 2>/dev/null
     rm -rf /debug_ramdisk/.magisk/pts 2>/dev/null
-    rm -f /debug_ramdisk/.magisk/block/preinit 2>/dev/null
-    if [ -b /dev/block/loop0 ]; then
+    rm -f /debug_ramdisk/.magisk/block/preinit /debug_ramdisk/.magisk/device/preinit 2>/dev/null
+    PREINIT_DEV=""
+    for _blk in /dev/block/loop0 /dev/block/loop1 /dev/block/by-name/boot /dev/block/bootdevice/by-name/boot; do
+        if [ -b "$_blk" ]; then
+            PREINIT_DEV="$_blk"
+            break
+        fi
+    done
+    if [ -z "$PREINIT_DEV" ]; then
+        for _blk in /dev/block/*; do
+            if [ -b "$_blk" ]; then
+                PREINIT_DEV="$_blk"
+                break
+            fi
+        done
+    fi
+    if [ -n "$PREINIT_DEV" ]; then
         touch /debug_ramdisk/.magisk/block/preinit 2>/dev/null
-        mount --bind /dev/block/loop0 /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+        mount --bind "$PREINIT_DEV" /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+        touch /debug_ramdisk/.magisk/device/preinit 2>/dev/null
+        mount --bind "$PREINIT_DEV" /debug_ramdisk/.magisk/device/preinit 2>/dev/null
     else
         mknod /debug_ramdisk/.magisk/block/preinit b 7 0 2>/dev/null || touch /debug_ramdisk/.magisk/block/preinit
+        mknod /debug_ramdisk/.magisk/device/preinit b 7 0 2>/dev/null || touch /debug_ramdisk/.magisk/device/preinit
     fi
-    chmod 600 /debug_ramdisk/.magisk/block/preinit 2>/dev/null
+    chmod 644 /debug_ramdisk/.magisk/block/preinit /debug_ramdisk/.magisk/device/preinit 2>/dev/null
+    chcon "$MAGISK_FILE_CON" /debug_ramdisk/.magisk/block/preinit /debug_ramdisk/.magisk/device/preinit 2>/dev/null
 
     if ! debug_ramdisk_xattr_ok; then
         return 1
@@ -1816,11 +1853,14 @@ else
     [ -s "$STAGE/init-ld" ] && stage_bin "$STAGE/init-ld" "$DATABIN/init-ld" 755
     stage_bin "$STAGE/util_functions.sh" "$DATABIN/util_functions.sh" 755
     copy_if_changed "$STAGE/addon.d.sh" "$DATABIN/addon.d.sh" 755
+    copy_if_changed "$STAGE/app_functions.sh" "$DATABIN/app_functions.sh" 755
     stage_bin "$STAGE/boot_patch.sh" "$DATABIN/boot_patch.sh" 755
     copy_if_changed "$STAGE/chromeos/futility" "$DATABIN/chromeos/futility" 755
     copy_if_changed "$STAGE/chromeos/kernel.keyblock" "$DATABIN/chromeos/kernel.keyblock" 644
     copy_if_changed "$STAGE/chromeos/kernel_data_key.vbprivk" "$DATABIN/chromeos/kernel_data_key.vbprivk" 644
     [ -x "$DATABIN/busybox" ] && BB="$DATABIN/busybox"
+    chmod 755 "$DATABIN" 2>/dev/null
+    chmod 755 "$DATABIN"/* 2>/dev/null
 fi
 
 chmod 755 "$STAGE/deploy-magisk.sh" "$STAGE/magiskd-guard.sh" 2>/dev/null
@@ -1869,6 +1909,16 @@ for t in ptmx_device devpts devpts_t; do
     $MPOLICY --live "allow magisk $t dir { search read open getattr }" >/dev/null 2>&1
 done
 $MPOLICY --live "allow magisk proc file { read write open getattr }" >/dev/null 2>&1
+
+for t in magisk_file; do
+    $MPOLICY --live "allow appdomain $t dir { search read open getattr }" >/dev/null 2>&1
+    $MPOLICY --live "allow appdomain $t file { read open getattr execute execute_no_trans }" >/dev/null 2>&1
+    $MPOLICY --live "allow appdomain $t lnk_file { read getattr }" >/dev/null 2>&1
+    $MPOLICY --live "allow appdomain $t sock_file { write getattr }" >/dev/null 2>&1
+done
+$MPOLICY --live "allow appdomain magisk unix_stream_socket { connectto }" >/dev/null 2>&1
+$MPOLICY --live "allow appdomain devpts chr_file { read write open ioctl getattr }" >/dev/null 2>&1
+$MPOLICY --live "allow appdomain untrusted_app_all unix_stream_socket { connectto }" >/dev/null 2>&1
 
 if : > "$DONE_MARKER" 2>/dev/null; then
     chmod 644 "$DONE_MARKER" 2>/dev/null
@@ -1959,6 +2009,9 @@ fi
 
 policy_rows > "$POL_SNAPSHOT"
 sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('bootloop',0);" >/dev/null
+sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('root_access',3);" >/dev/null
+sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('su_request_timeout',15);" >/dev/null
+sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('multiuser_mode',0);" >/dev/null
 
 disable_all_modules
 hide_boot_scripts

@@ -173,11 +173,17 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
                     progress = 1f
                     rooted = true
                     managerAvailable = true
+                } else {
+                    rooted = false
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "exploit exception", e)
             report("\n例外：$e\n")
+            mMain.post {
+                status = "DFRoot：失敗 — 例外：${e.message}"
+                rooted = false
+            }
         } finally {
             mMain.post {
                 running = false

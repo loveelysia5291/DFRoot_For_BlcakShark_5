@@ -171,6 +171,27 @@ object DfIcons {
             }
         }
     }
+
+    val Check: ImageVector by lazy {
+        build("DfRoot.Check") {
+            stroke {
+                moveTo(4.5f, 12.5f)
+                lineTo(9.5f, 17.5f)
+                lineTo(19.5f, 7.5f)
+            }
+        }
+    }
+
+    val Close: ImageVector by lazy {
+        build("DfRoot.Close") {
+            stroke {
+                moveTo(6f, 6f)
+                lineTo(18f, 18f)
+                moveTo(18f, 6f)
+                lineTo(6f, 18f)
+            }
+        }
+    }
 }
 
 private fun build(name: String, block: ImageVector.Builder.() -> Unit): ImageVector =
