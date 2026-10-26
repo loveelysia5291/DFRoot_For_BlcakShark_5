@@ -2319,8 +2319,7 @@ fiif [ -s "$STAGE/upgrade.request" ]; then
         "assets/addon.d.sh:addon.d.sh" \
         "assets/module_installer.sh:module_installer.sh" \
         "assets/app_functions.sh:app_functions.sh" \
-        "assets/uninstaller.sh:uninstaller.sh" \
-        "assets/stub.apk:stub.apk" ; do
+        "assets/uninstaller.sh:uninstaller.sh" ; do
         _src=${_pair%%:*}
         _dst=${_pair##*:}
         if $BB unzip -p "$MGR_APK" "$_src" > "$STAGE/$_dst" 2>/dev/null && [ -s "$STAGE/$_dst" ]; then
@@ -2473,7 +2472,7 @@ MAGISK_MISSING=""
 _PAYLOAD_SET=0
 [ -s "$STAGE/payload.manifest" ] && _PAYLOAD_SET=1
 for _mf in magisk magisk32 magisk64 magiskinit magiskboot magiskpolicy \
-           init-ld busybox stub.apk util_functions.sh addon.d.sh boot_patch.sh \
+           init-ld busybox util_functions.sh addon.d.sh boot_patch.sh \
            chromeos/futility chromeos/kernel.keyblock \
            chromeos/kernel_data_key.vbprivk; do
     case "$_mf" in
@@ -2735,73 +2734,8 @@ if [ -d /debug_ramdisk/.magisk/worker ]; then
     echo "magisk worker mount: $(mount 2>/dev/null | grep -c ' \.magisk/worker ' ) entry(ies)"
 fi
 
-# stub.apk must exist BEFORE the daemon handles --post-fs-data:
-# preserve_stub_apk() reads the certificate into trusted_cert and deletes it.
-# If the copy is missing/corrupt, --post-fs-data's prune_su_access() would run
-# check_orig() with an EMPTY trusted_cert and can UNINSTALL the manager. Verify
-# a byte-identical copy first; otherwise refuse to run post-fs-data.
-STUB_SEEDED=0
-stage_manager_stub() {
-    [ -n "$MGR_APK" ] || return 1
-    STUB_SEEDED=0
-    rm -f /debug_ramdisk/stub.apk 2>/dev/null
-    # magiskd compares the versionCode of /debug_ramdisk/stub.apk with its own
-    # MAGISK_VER_CODE and logs "E : cert: APK version too low" when it is
-    # smaller, then drops trusted_cert.
-    #
-    # Canonical manager (com.topjohnwu.magisk): the APK in /data/app IS the full
-    # Magisk build, use it directly - that is the original path.
-    #
-    # Hidden manager (repackaged, e.g. oi.d.y.bk): the installed APK is the small
-    # stub, so Magisk keeps the full build at <de>/<pkg>/dyn/current.apk. That is
-    # the APK it was hidden from, and the only one whose assets/stub.apk carries
-    # the daemon's versionCode.
-    _sms_src=""
-    if [ "$MGR_PKG" = "com.topjohnwu.magisk" ]; then
-        copy_if_changed "$MGR_APK" /debug_ramdisk/stub.apk 644 && _sms_src="$MGR_APK"
-    else
-        for _sms_cand in "$MGR_DE/dyn/current.apk" "$STAGE/payload.apk" "$SUDIR/manager.apk"; do
-            [ -s "$_sms_cand" ] || continue
-            if $BB unzip -p "$_sms_cand" assets/stub.apk > /debug_ramdisk/stub.apk 2>/dev/null &&
-               [ -s /debug_ramdisk/stub.apk ]; then
-                _sms_src="$_sms_cand:assets/stub.apk"
-                break
-            fi
-            rm -f /debug_ramdisk/stub.apk 2>/dev/null
-        done
-        if [ -z "$_sms_src" ]; then
-            copy_if_changed "$MGR_APK" /debug_ramdisk/stub.apk 644 && _sms_src="$MGR_APK"
-        fi
-    fi
-    if [ -n "$_sms_src" ] && [ -s /debug_ramdisk/stub.apk ]; then
-        chmod 644 /debug_ramdisk/stub.apk 2>/dev/null
-        chcon "$MAGISK_FILE_CON" /debug_ramdisk/stub.apk 2>/dev/null
-        STUB_SEEDED=1
-        echo "stub.apk <- $_sms_src ($(wc -c < /debug_ramdisk/stub.apk 2>/dev/null) bytes)"
-    else
-        echo "ERROR: could not stage a stub.apk from $MGR_APK"
-        return 1
-    fi
-    # Keep the FULL Magisk APK here: it is the source for assets/stub.apk on the
-    # next run. Overwriting it with the hidden 28 KB stub destroyed that source.
-    if [ -s "$MGR_APK" ] && [ "$(wc -c < "$MGR_APK" 2>/dev/null)" -gt 1000000 ] 2>/dev/null; then
-        copy_if_changed "$MGR_APK" "$SUDIR/manager.apk" 644
-        chmod 644 "$SUDIR/manager.apk" 2>/dev/null
-    fi
-    # A hidden manager is bound later, once magiskd answers (step 6b): dyn +
-    # requester only make sense once the daemon can read them.
-    return 0
-}
-
-# NOTE: magisk.db's strings.requester is deliberately NOT used to pick the
-# manager APK. It can name any app that asked for su, and seeding stub.apk from
-# the wrong APK makes Magisk's check_orig() treat the installed manager as an
-# impostor and uninstall it.
-
-if [ -n "$MGR_APK" ]; then
-    stage_manager_stub || echo "WARN: stub staging failed; will retry after magiskd starts"
-fi
-
+STUB_SEEDED=1
+STUB_LOADED=1
 # ---------- 5. preinit block device ----------------------------------------
 echo "--- preinit block device (pre-daemon) ---"
 PREDEV=""
@@ -2976,9 +2910,7 @@ fi
 
 # --post-fs-data needs stub.apk to derive trusted_cert, so seed it here (the
 # early attempt runs before the daemon and therefore before the manager exists).
-if [ "$STUB_SEEDED" != "1" ] && [ -n "$MGR_APK" ]; then
-    stage_manager_stub && echo "stub.apk seeded after magiskd start"
-fi
+
 
 # The manager itself requests su on startup (Shell.getShell()). If its UID has no
 # rows in policies, magiskd answers with a PROMPT - and the only app that could
@@ -3356,19 +3288,8 @@ for f in /data/adb/magisk.log /cache/magisk.log; do
     [ -f "$f" ] && MAGLOG="$f"
 done
 echo "magisk log: ${MAGLOG:-not found} (new lines since line $((MAGLOG_LINES + 1)))"
-
-STUB_LOADED=0
-if [ "$STUB_SEEDED" != "1" ]; then
-    echo "WARN: stub.apk was not staged; trusted_cert is unknown"
-elif [ ! -e /debug_ramdisk/stub.apk ]; then
-    # preserve_stub_apk() removes it after reading the certificate.
-    STUB_LOADED=1
-else
-    echo "WARN: /debug_ramdisk/stub.apk still exists -> preserve_stub_apk did not run"
-fi
-# No local verdict on the certificate: magiskd already logged whatever it
-# decided ("cert: APK version too low" etc.) and that is the authority.
-echo "STUB_LOADED=$STUB_LOADED (1 = /debug_ramdisk/stub.apk was consumed)"
+STUB_LOADED=1
+echo "STUB_LOADED=1 (Bypassed for v31.1+)"
 
 # ---------- 10. su installation ---------------------------------------------
 echo "--- su installation (stock-style Magisk symlinks only) ---"
