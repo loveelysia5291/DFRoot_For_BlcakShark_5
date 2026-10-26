@@ -109,7 +109,6 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
                 onImportMagisk = {
                     pickApkLauncher.launch("application/vnd.android.package-archive")
                 },
-                onOpenRecords = { },
                 onSaveLog = { saveLogToDownloads() },
                 onClearLog = {
                     logBuilder.setLength(0)

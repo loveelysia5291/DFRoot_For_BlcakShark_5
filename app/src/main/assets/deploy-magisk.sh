@@ -1865,7 +1865,7 @@ if [ -n "$MAGISK_MISSING" ]; then
     fatal "incomplete Magisk file set:$MAGISK_MISSING"
 fi
 echo "Magisk file set: complete"
-progress 30
+progress 40
 
 read_soft_reboot_pref() {
     SOFT_REBOOT=0
@@ -1884,7 +1884,7 @@ recover_modules
 OLD=$($BB pidof magiskd 2>/dev/null)
 if [ -n "$OLD" ]; then
     kill_pid_list "$OLD"
-    sleep 1
+    $BB usleep 150000 2>/dev/null || sleep 1
     rm -f /debug_ramdisk/.magisk/device/socket 2>/dev/null
 fi
 
@@ -1910,6 +1910,7 @@ done
 $MPOLICY --live "allow appdomain magisk unix_stream_socket { connectto }" >/dev/null 2>&1
 $MPOLICY --live "allow appdomain devpts chr_file { read write open ioctl getattr }" >/dev/null 2>&1
 $MPOLICY --live "allow appdomain untrusted_app_all unix_stream_socket { connectto }" >/dev/null 2>&1
+progress 55
 
 if : > "$DONE_MARKER" 2>/dev/null; then
     chmod 644 "$DONE_MARKER" 2>/dev/null
@@ -1948,6 +1949,7 @@ if [ -n "$MGR_PKG" ]; then
 fi
 
 prepare_debug_ramdisk || fatal "could not prepare xattr-capable /debug_ramdisk"
+progress 70
 mkdir -p /debug_ramdisk/.magisk/busybox /debug_ramdisk/.magisk/device \
          /debug_ramdisk/.magisk/block /debug_ramdisk/.magisk/worker 2>/dev/null
 rm -rf /debug_ramdisk/.magisk/pts 2>/dev/null
@@ -1975,6 +1977,7 @@ for _w in 1 2 3 4 5 6 7 8 9 10; do
     $BB usleep 100000 2>/dev/null || sleep 1
 done
 [ -n "$MPID" ] || fatal "magiskd did not start"
+progress 85
 
 SQLBIN=/debug_ramdisk/magisk
 for i in 1 2 3 4 5; do
@@ -2019,11 +2022,12 @@ hide_boot_scripts
 $PBB timeout 60 "$CLIENT" --post-fs-data
 restore_boot_scripts
 restore_disabled_modules
-sleep 1
+$BB usleep 150000 2>/dev/null || sleep 1
 
 POL_CURRENT=$SUDIR/policies.after
 policy_rows > "$POL_CURRENT"
 restore_missing_policies "$POL_CURRENT"
+progress 95
 
 install_stock_su
 
@@ -2050,6 +2054,7 @@ close_legacy_channel
 if [ "$MAGISK_SU_OK" = "1" ]; then
     prepare_lsposed
     RESULT=ok
+    progress 100
     echo "clean: 注入成功，移除 user_de 暫存二進制檔案"
     rm -f "$STAGE/magisk" "$STAGE/magiskinit" "$STAGE/magiskboot" "$STAGE/magiskpolicy" \
           "$STAGE/busybox" "$STAGE/init-ld" "$STAGE/bootctl" "$STAGE/magisk32" "$STAGE/magisk64" \
