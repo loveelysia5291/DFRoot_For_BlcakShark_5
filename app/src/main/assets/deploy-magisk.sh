@@ -801,11 +801,11 @@ zn_daemon_pid() {
 stop_zygisk_next() {
     _sz_bb=${PBB:-$BB}
     _sz_pids=""
-    for _sz_p in $_sz_bb ps -A -o PID 2>/dev/null; do
+    for _sz_p in $($_sz_bb ps -A -o PID 2>/dev/null); do
         case "$_sz_p" in
             ''|*[!0-9]*) continue ;;
         esac
-        _sz_exe=$_sz_bb readlink /proc/$_sz_p/exe 2>/dev/null
+        _sz_exe=$($_sz_bb readlink /proc/$_sz_p/exe 2>/dev/null)
         case "$_sz_exe" in
             *zygisksu*) _sz_pids="$_sz_pids $_sz_p" ;;
         esac
