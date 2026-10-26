@@ -2315,6 +2315,7 @@ if [ -s "$STAGE/upgrade.request" ]; then
         "lib/arm64-v8a/libmagiskpolicy.so:magiskpolicy" \
         "lib/arm64-v8a/libbusybox.so:busybox" \
         "lib/arm64-v8a/libinit-ld.so:init-ld" \
+        "lib/arm64-v8a/libbootctl.so:bootctl" \
         "assets/boot_patch.sh:boot_patch.sh" \
         "assets/util_functions.sh:util_functions.sh" \
         "assets/addon.d.sh:addon.d.sh" \
