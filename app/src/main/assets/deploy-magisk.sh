@@ -2010,27 +2010,8 @@ if [ -n "$MGR_UID" ]; then
     sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($MGR_UID,2,0,1,0);" >/dev/null 2>&1
 fi
 
-# Pre-grant shell (UID 2000 / ADB) and DFRoot
-sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES (2000,2,0,1,0);" >/dev/null 2>&1
-_df_uid=$(pkg_uid df.root 2>/dev/null)
-[ -n "$_df_uid" ] && sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($_df_uid,2,0,1,0);" >/dev/null 2>&1
-
-# Pre-grant installed root utilities (e.g. Shizuku, MT Manager, Termux)
-if [ -s "$PKGLIST" ]; then
-    for _target_pkg in moe.shizuku.privileged.api bin.mt.plus com.termux io.github.vvb2060.magisk; do
-        _puid=$(pkg_uid "$_target_pkg" 2>/dev/null)
-        if [ -n "$_puid" ]; then
-            sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($_puid,2,0,1,1);" >/dev/null 2>&1
-            echo "granted root policy for $_target_pkg (uid $_puid)"
-        fi
-    done
-fi
-
 policy_rows > "$POL_SNAPSHOT"
 sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('bootloop',0);" >/dev/null
-sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('root_access',3);" >/dev/null
-sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('su_request_timeout',15);" >/dev/null
-sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('multiuser_mode',0);" >/dev/null
 
 disable_all_modules
 hide_boot_scripts
@@ -2043,16 +2024,6 @@ sleep 1
 POL_CURRENT=$SUDIR/policies.after
 policy_rows > "$POL_CURRENT"
 restore_missing_policies "$POL_CURRENT"
-
-# Ensure policies are preserved for target root apps
-if [ -s "$PKGLIST" ]; then
-    for _target_pkg in moe.shizuku.privileged.api bin.mt.plus com.termux io.github.vvb2060.magisk; do
-        _puid=$(pkg_uid "$_target_pkg" 2>/dev/null)
-        if [ -n "$_puid" ]; then
-            sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($_puid,2,0,1,1);" >/dev/null 2>&1
-        fi
-    done
-fi
 
 install_stock_su
 
