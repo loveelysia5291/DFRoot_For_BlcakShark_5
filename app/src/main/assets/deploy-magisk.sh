@@ -1210,7 +1210,7 @@ soft_reboot_lsposed() {
     fi
     return 0
 
-
+}
 debug_ramdisk_xattr_ok() {
     _probe=/debug_ramdisk/.dfroot_xattr_probe
     rm -f "$_probe" 2>/dev/null
@@ -1584,7 +1584,7 @@ setup_app_process_transport() {
     if [ "$APP_PROCESS" = "/system/bin/app_process" ]; then
         APP_TRANSPORT_OK=1
         return 0
-    ]
+    fi
     if ! ln -sf "$APP_PROCESS" "$APP_PROXY" 2>/dev/null; then
         return 1
     fi
@@ -1776,9 +1776,12 @@ if [ -s "$STAGE/upgrade.request" ] || [ ! -s "$STAGE/magisk" ]; then
     printf '%s\n' "${APK_VER_CODE:-0}" > "$SUDIR/installed.version" 2>/dev/null
     chmod 644 "$SUDIR/installed.version" 2>/dev/null
     
-    # 修正 STAGE 目錄下的所有檔案與擁有者權限，解決 FileNotFoundException 與權限拒絕
-    _df_uid=$(pkg_uid df.root 2>/dev/null)
-    [ -n "$_df_uid" ] && chown -R "$_df_uid:$_df_uid" "$STAGE" 2>/dev/null
+    
+    __df_uid=$(pkg_uid df.root 2>/dev/null)
+if [ -n "$_df_uid" ]; then
+    chown -R "$_df_uid:$_df_uid" "$STAGE" 2>/dev/null
+    chmod 771 "$STAGE" 2>/dev/null
+fi
     
     rm -f "$STAGE/payload.applied" "$STAGE/payload.manifest" 2>/dev/null
     MAGISK_FILES_FORCE=1
