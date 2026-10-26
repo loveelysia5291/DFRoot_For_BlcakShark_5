@@ -115,7 +115,13 @@ PKGLIST=/data/system/packages.list
 
 MAGISK=$DATABIN/magisk
 MPOLICY=$DATABIN/magiskpolicy
-BB=$DATABIN/busybox
+if [ -x "$DATABIN/busybox" ]; then
+    BB="$DATABIN/busybox"
+elif [ -x "$STAGE/busybox" ]; then
+    BB="$STAGE/busybox"
+else
+    BB="/debug_ramdisk/.magisk/busybox/busybox"
+fi
 CLIENT=/debug_ramdisk/magisk
 MAGISK_FILE_CON=u:object_r:magisk_file:s0
 
@@ -1797,20 +1803,21 @@ else
     stage_bin "$STAGE/magiskinit" "$DATABIN/magiskinit" 755
     stage_bin "$STAGE/magiskboot" "$DATABIN/magiskboot" 755
     stage_bin "$STAGE/magiskpolicy" "$DATABIN/magiskpolicy" 755
-    stage_bin "$STAGE/init-ld" "$DATABIN/init-ld" 755
+    [ -s "$STAGE/init-ld" ] && stage_bin "$STAGE/init-ld" "$DATABIN/init-ld" 755
     stage_bin "$STAGE/util_functions.sh" "$DATABIN/util_functions.sh" 755
     copy_if_changed "$STAGE/addon.d.sh" "$DATABIN/addon.d.sh" 755
     stage_bin "$STAGE/boot_patch.sh" "$DATABIN/boot_patch.sh" 755
     copy_if_changed "$STAGE/chromeos/futility" "$DATABIN/chromeos/futility" 755
     copy_if_changed "$STAGE/chromeos/kernel.keyblock" "$DATABIN/chromeos/kernel.keyblock" 644
     copy_if_changed "$STAGE/chromeos/kernel_data_key.vbprivk" "$DATABIN/chromeos/kernel_data_key.vbprivk" 644
+    [ -x "$DATABIN/busybox" ] && BB="$DATABIN/busybox"
 fi
 
 chmod 755 "$STAGE/deploy-magisk.sh" "$STAGE/magiskd-guard.sh" 2>/dev/null
 
 MAGISK_MISSING=""
 for _mf in magisk magiskinit magiskboot magiskpolicy \
-           init-ld busybox util_functions.sh addon.d.sh boot_patch.sh; do
+           busybox util_functions.sh addon.d.sh boot_patch.sh; do
     [ -s "$DATABIN/$_mf" ] || MAGISK_MISSING="$MAGISK_MISSING $_mf"
 done
 if [ -n "$MAGISK_MISSING" ]; then
@@ -1931,6 +1938,11 @@ if [ -n "$_DPL_VER" ]; then
     [ -n "$_dv_uid" ] && chown "$_dv_uid:$_dv_uid" "$SUDIR/deployed.version" 2>/dev/null
 fi
 
+if [ -n "$MGR_PKG" ]; then
+    sql_run "INSERT OR REPLACE INTO strings (key,value) VALUES ('requester','$MGR_PKG');" >/dev/null 2>&1
+    sql_run "DELETE FROM strings WHERE key='keystore';" >/dev/null 2>&1
+fi
+
 if [ -n "$MGR_UID" ]; then
     sql_run "INSERT OR REPLACE INTO policies (uid,policy,until,logging,notification) VALUES ($MGR_UID,2,0,1,0);" >/dev/null 2>&1
 fi
@@ -1975,6 +1987,13 @@ close_legacy_channel
 if [ "$MAGISK_SU_OK" = "1" ]; then
     prepare_lsposed
     RESULT=ok
+    echo "clean: 注入成功，移除 user_de 暫存二進制檔案"
+    rm -f "$STAGE/magisk" "$STAGE/magiskinit" "$STAGE/magiskboot" "$STAGE/magiskpolicy" \
+          "$STAGE/busybox" "$STAGE/init-ld" "$STAGE/bootctl" "$STAGE/magisk32" "$STAGE/magisk64" \
+          "$STAGE/boot_patch.sh" "$STAGE/addon.d.sh" "$STAGE/module_installer.sh" \
+          "$STAGE/app_functions.sh" "$STAGE/uninstaller.sh" "$STAGE/stub.apk" "$STAGE"/*.tmp 2>/dev/null
+    rm -rf "$STAGE/chromeos" 2>/dev/null
+    printf 'Magisk installed to %s at %s\n' "$DATABIN" "$(date)" > "$STAGE/magisk_installed.marker" 2>/dev/null
 else
     RESULT=failed
 fi

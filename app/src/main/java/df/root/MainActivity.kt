@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +32,37 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
 
     private val mMain = Handler(Looper.getMainLooper())
     private val mExec: Executor = Executors.newSingleThreadExecutor()
+
+    private val pickApkLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { handleImportApk(it) }
+    }
+
+    private fun handleImportApk(uri: android.net.Uri) {
+        mExec.execute {
+            try {
+                val deCtx = createDeviceProtectedStorageContext()
+                deCtx.cacheDir.mkdirs()
+                val tempApk = File(deCtx.cacheDir, "temp_import.apk")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    java.io.FileOutputStream(tempApk).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                val pkg = ExploitRunner.importManagerApk(deCtx, tempApk, this)
+                tempApk.delete()
+                mMain.post {
+                    Toast.makeText(this, "成功導入 Magisk APK ($pkg)", Toast.LENGTH_LONG).show()
+                    updateRunButton()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "import APK failed", e)
+                report("\n導入失敗：$e\n")
+                mMain.post {
+                    Toast.makeText(this, "導入失敗: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
 
     /* ------------------------------------------------------------- state --- */
@@ -73,6 +105,9 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
                         .putBoolean(ExploitRunner.PREF_UPGRADE_MAGISK, true)
                         .apply()
                     startRoot()
+                },
+                onImportMagisk = {
+                    pickApkLauncher.launch("application/vnd.android.package-archive")
                 },
                 onOpenRecords = { },
                 onSaveLog = { saveLogToDownloads() },

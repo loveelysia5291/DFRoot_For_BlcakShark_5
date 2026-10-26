@@ -87,6 +87,7 @@ fun DfRootApp(
     onLaunchRoot: () -> Unit,
     onOpenMagisk: () -> Unit,
     onUpgradeMagisk: () -> Unit,
+    onImportMagisk: () -> Unit,
     onOpenRecords: () -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
@@ -97,8 +98,9 @@ fun DfRootApp(
             state = state,
             onLaunchRoot = onLaunchRoot,
             onOpenMagisk = onOpenMagisk,
-                    onUpgradeMagisk = onUpgradeMagisk,
-                    onOpenRecords = onOpenRecords,
+            onUpgradeMagisk = onUpgradeMagisk,
+            onImportMagisk = onImportMagisk,
+            onOpenRecords = onOpenRecords,
             onSaveLog = onSaveLog,
             onClearLog = onClearLog,
         )
@@ -112,6 +114,7 @@ private fun DfRootContent(
     onLaunchRoot: () -> Unit,
     onOpenMagisk: () -> Unit,
     onUpgradeMagisk: () -> Unit,
+    onImportMagisk: () -> Unit,
     onOpenRecords: () -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
@@ -187,6 +190,7 @@ private fun DfRootContent(
                     onLaunchRoot = onLaunchRoot,
                     onOpenMagisk = onOpenMagisk,
                     onUpgradeMagisk = onUpgradeMagisk,
+                    onImportMagisk = onImportMagisk,
                     onOpenRecords = { go(1) },
                     onOpenSettings = { go(2) },
                 )
@@ -210,6 +214,7 @@ private fun HomeScreen(
     onLaunchRoot: () -> Unit,
     onOpenMagisk: () -> Unit,
     onUpgradeMagisk: () -> Unit,
+    onImportMagisk: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenRecords: () -> Unit,
 ) {
@@ -315,6 +320,14 @@ private fun HomeScreen(
                 // Same row style as 設定 / 檢視紀錄, above 設定. The deploy no
                 // longer hashes the manager APK, so this is the only way to
                 // refresh the staged Magisk file set.
+                ActionRow(
+                    icon = DfIcons.Import,
+                    title = "導入 Magisk APK",
+                    summary = "自訂 Magisk APK，替換二進制並提取包名",
+                    enabled = !state.running,
+                    onClick = onImportMagisk,
+                )
+                HorizontalDivider()
                 ActionRow(
                     icon = DfIcons.Refresh,
                     title = "升級 Magisk 版本",
