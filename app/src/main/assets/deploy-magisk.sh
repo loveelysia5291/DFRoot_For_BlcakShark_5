@@ -1269,8 +1269,6 @@ prepare_debug_ramdisk() {
     if [ -n "$PREINIT_DEV" ]; then
         ln -sf "$PREINIT_DEV" /debug_ramdisk/.magisk/block/preinit 2>/dev/null
         ln -sf "$PREINIT_DEV" /debug_ramdisk/.magisk/device/preinit 2>/dev/null
-        mount --bind "$PREINIT_DEV" /debug_ramdisk/.magisk/block/preinit 2>/dev/null
-        mount --bind "$PREINIT_DEV" /debug_ramdisk/.magisk/device/preinit 2>/dev/null
     fi
     if [ ! -b /debug_ramdisk/.magisk/device/preinit ]; then
         mknod /debug_ramdisk/.magisk/block/preinit b 7 0 2>/dev/null
@@ -1984,8 +1982,10 @@ for i in 1 2 3 4 5; do
     $BB usleep 150000 2>/dev/null || sleep 1
 done
 
+MAKEDEV=1 "$SQLBIN" --preinit-device >/dev/null 2>&1
+
 _DPL_VER=$($BB timeout 5 "$SQLBIN" -V 2>&1 | $BB head -1 | $BB tr -dc '0-9')
-_DPL_VER_STR=$($BB timeout 5 "$SQLBIN" -v 2>&1 | $BB head -1 | $BB awk '{print $1}')
+_DPL_VER_STR=$($BB timeout 5 "$SQLBIN" -v 2>&1 | $BB head -1 | $BB awk -F: '{print $1}' | $BB awk '{print $1}')
 if [ -n "$_DPL_VER" ]; then
     printf 'Magisk %s\n' "$_DPL_VER" > "$SUDIR/deployed.version" 2>/dev/null
     _dv_uid=$(pkg_uid df.root 2>/dev/null)
