@@ -1108,9 +1108,7 @@ soft_reboot_lsposed() {
         echo "ERROR: lspd did not start"
         setenforce 1 2>/dev/null
         return 1
-    $BB usleep 500000 2>/dev/null || sleep 1
-    LSPD_PID=$(lspd_single_pid 2>/dev/null)
-    [ -n "$LSPD_PID" ] || { setenforce 1 2>/dev/null; return 1; }
+    fi
 
     _srl_old_ss=$($_srl_bb pidof system_server 2>/dev/null)
     ZYGOTE_BEFORE=$(zygote_primary_pid)
@@ -1618,7 +1616,7 @@ setup_app_process_transport() {
     APP_TRANSPORT_OK=1
     APP_RUN="$APP_PROXY"
     return 0
-
+}
 
 policy_rows() {
     _bb=$BB
