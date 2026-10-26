@@ -1618,7 +1618,7 @@ setup_app_process_transport() {
     APP_TRANSPORT_OK=1
     APP_RUN="$APP_PROXY"
     return 0
-}
+
 
 policy_rows() {
     _bb=$BB
