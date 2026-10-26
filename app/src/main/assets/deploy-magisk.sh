@@ -2302,7 +2302,8 @@ echo "magisk: installed ${APK_VER_NAME:-?} (${APK_VER_CODE:-0}), deployed ${DEPL
 # like a confirmed upgrade and pulls the binaries out of the installed APK.
 if [ ! -s "$SUDIR/deployed.version" ] && [ ! -s "$STAGE/upgrade.request" ]; then
     : > "$STAGE/upgrade.request" 2>/dev/null
-fiif [ -s "$STAGE/upgrade.request" ]; then
+fi
+if [ -s "$STAGE/upgrade.request" ]; then
     rm -f "$STAGE/upgrade.request" 2>/dev/null
     echo "magisk: upgrade requested -> extracting the file set from the installed APK"
     mkdir -p "$STAGE/chromeos" 2>/dev/null
