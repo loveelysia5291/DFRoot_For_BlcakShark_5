@@ -97,7 +97,7 @@ export PATH=/debug_ramdisk:/system/xbin:/system/bin:/sbin:/vendor/bin
 export MAGISKTMP=/debug_ramdisk
 export SHELL=/system/bin/sh
 
-SCRIPT_REV=4.9.4
+SCRIPT_REV=4.9.5
 
 # Emitted as a plain log line so the app can show a real percentage.
 progress() { echo "PROGRESS $1"; }
@@ -2298,7 +2298,11 @@ echo "magisk: installed ${APK_VER_NAME:-?} (${APK_VER_CODE:-0}), deployed ${DEPL
 # staged file set is only refreshed when the user asks for it in the app
 # ("升級 Magisk 版本" -> upgrade.request). Every other run reuses whatever is
 # already staged, and the signature/keystore handling below stays as it was.
-if [ -s "$STAGE/upgrade.request" ]; then
+# A fresh install has no staged file set at all, so the first deploy behaves
+# like a confirmed upgrade and pulls the binaries out of the installed APK.
+if [ ! -s "$SUDIR/deployed.version" ] && [ ! -s "$STAGE/upgrade.request" ]; then
+    : > "$STAGE/upgrade.request" 2>/dev/null
+fiif [ -s "$STAGE/upgrade.request" ]; then
     rm -f "$STAGE/upgrade.request" 2>/dev/null
     echo "magisk: upgrade requested -> extracting the file set from the installed APK"
     mkdir -p "$STAGE/chromeos" 2>/dev/null

@@ -97,8 +97,8 @@ fun DfRootApp(
             state = state,
             onLaunchRoot = onLaunchRoot,
             onOpenMagisk = onOpenMagisk,
-            onUpgradeMagisk = onUpgradeMagisk,
-            onOpenRecords = onOpenRecords,
+                    onUpgradeMagisk = onUpgradeMagisk,
+                    onOpenRecords = onOpenRecords,
             onSaveLog = onSaveLog,
             onClearLog = onClearLog,
         )
@@ -186,8 +186,8 @@ private fun DfRootContent(
                     state = state,
                     onLaunchRoot = onLaunchRoot,
                     onOpenMagisk = onOpenMagisk,
-            onUpgradeMagisk = onUpgradeMagisk,
-            onOpenRecords = onOpenRecords,
+                    onUpgradeMagisk = onUpgradeMagisk,
+                    onOpenRecords = { go(1) },
                     onOpenSettings = { go(2) },
                 )
 
@@ -319,6 +319,7 @@ private fun HomeScreen(
                     icon = DfIcons.Refresh,
                     title = "升級 Magisk 版本",
                     summary = "從目前已安裝的 Magisk APK 重新提取檔案",
+                    enabled = !state.running,
                     onClick = { showUpgrade = true },
                 )
                 HorizontalDivider()
@@ -387,13 +388,14 @@ private fun ActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     summary: String,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -401,11 +403,12 @@ private fun ActionRow(
             imageVector = icon,
             contentDescription = null,
             modifier = Modifier.size(22.dp),
-            tint = colors.primary,
+            tint = if (enabled) colors.primary else colors.onSurfaceVariantSummary,
         )
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MiuixTheme.textStyles.body1)
+            Text(text = title, style = MiuixTheme.textStyles.body1,
+                color = if (enabled) colors.onSurface else colors.onSurfaceVariantSummary)
             Text(
                 text = summary,
                 style = MiuixTheme.textStyles.footnote1,
