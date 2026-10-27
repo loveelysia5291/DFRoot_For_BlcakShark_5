@@ -14,7 +14,7 @@ For Black Shark SHARK PAR-H0 的臨時 root 注入工具：
 本專案為 **GNU General Public License v2.0**（見 `LICENSE`）。
 衍生自 DFRoot（loveelysia5291/DFRoot）。散布二進位時必須同時提供對應原始碼。
 
-## 目前版本（4.9.0）
+## 目前版本（4.9.6）
 
 **執行漏洞前請先安裝Magisk(https://github.com/topjohnwu/Magisk)
 
