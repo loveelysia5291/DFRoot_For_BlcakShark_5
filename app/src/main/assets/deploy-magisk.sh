@@ -1394,38 +1394,7 @@ restore_one_module() {
     [ ! -e "$_rom_dst" ] && mv "$_rom_off" "$_rom_dst" 2>/dev/null
 }
 
-restore_one_boot_script() {
-    _rbs=$1
-    [ -e "$_rbs" ] || return 0
-    _rbs_dir=${_rbs%/*}
-    _rbs_name=${_rbs##*/}
-    _rbs_name=${_rbs_name%%.dfroot_pfs_off*}
-    _rbs_dst="$_rbs_dir/$_rbs_name"
-    [ ! -e "$_rbs_dst" ] && mv "$_rbs" "$_rbs_dst" 2>/dev/null
-}
 
-restore_module_scripts() {
-    for _rms_base in /data/adb/modules /data/adb/modules_update; do
-        [ -d "$_rms_base" ] || continue
-        for _rms in "$_rms_base"/*/post-fs-data.sh.dfroot_pfs_off*; do
-            [ -e "$_rms" ] || continue
-            restore_one_boot_script "$_rms"
-        done
-    done
-}
-
-restore_pfsd_backups() {
-    for _rpb in "$BOOT_PFSD_PREFIX"* /data/adb/post-fs-data.d.dfroot_off; do
-        [ -e "$_rpb" ] || continue
-        [ ! -e /data/adb/post-fs-data.d ] && mv "$_rpb" /data/adb/post-fs-data.d 2>/dev/null
-    done
-}
-
-restore_boot_scripts() {
-    restore_module_scripts
-    restore_pfsd_backups
-    BOOT_SCRIPTS_OFF=0
-}
 
 disable_all_modules() {
     MODULES_DISABLED_BY_US=""
@@ -1447,54 +1416,21 @@ restore_disabled_modules() {
     MODULES_DISABLED_BY_US=""
 }
 
-hide_one_boot_script() {
-    _hbs=$1
-    [ -e "$_hbs" ] || return 0
-    _hbs_off="$_hbs$BOOT_SCRIPT_SUFFIX.$$"
-    if mv "$_hbs" "$_hbs_off" 2>/dev/null; then
-        BOOT_SCRIPTS_OFF=$((BOOT_SCRIPTS_OFF + 1))
-        return 0
-    fi
-    return 1
-}
-
-hide_boot_scripts() {
-    BOOT_SCRIPTS_OFF=0
-    _hbs_fail=0
-    if [ -e /data/adb/post-fs-data.d ]; then
-        _hbs_pfsd="$BOOT_PFSD_PREFIX.$$"
-        if mv /data/adb/post-fs-data.d "$_hbs_pfsd" 2>/dev/null; then
-            BOOT_SCRIPTS_OFF=$((BOOT_SCRIPTS_OFF + 1))
-        else
-            _hbs_fail=1
-        fi
-    fi
-    for _hbs_base in /data/adb/modules /data/adb/modules_update; do
-        [ -d "$_hbs_base" ] || continue
-        for _hbs_d in "$_hbs_base"/*; do
-            [ -d "$_hbs_d" ] || continue
-            [ -e "$_hbs_d/post-fs-data.sh" ] || continue
-            hide_one_boot_script "$_hbs_d/post-fs-data.sh" || _hbs_fail=1
-        done
-    done
-    [ "$_hbs_fail" = "0" ]
-}
 
 recover_modules() {
     restore_one_module modules
     restore_one_module modules_update
-    restore_pfsd_backups
-    restore_module_scripts
 }
 
+
 on_exit() {
-    restore_boot_scripts
     restore_disabled_modules
     [ -e /proc/dfroot_su ] && /system/bin/cat /proc/dfroot_su >/dev/null 2>&1
     rm -f /data/local/tmp/su /data/local/tmp/su-client \
           "$SUDIR/su.legacy" 2>/dev/null
     setenforce 1 2>/dev/null
 }
+
 trap on_exit EXIT INT TERM HUP
 
 fatal() {
@@ -2017,16 +1953,15 @@ policy_rows > "$POL_SNAPSHOT"
 sql_run "INSERT OR REPLACE INTO settings(key,value) VALUES('bootloop',0);" >/dev/null
 
 disable_all_modules
-hide_boot_scripts
 
 $PBB timeout 60 "$CLIENT" --post-fs-data
-restore_boot_scripts
 restore_disabled_modules
 $BB usleep 150000 2>/dev/null || sleep 1
 
 POL_CURRENT=$SUDIR/policies.after
 policy_rows > "$POL_CURRENT"
 restore_missing_policies "$POL_CURRENT"
+
 progress 95
 
 install_stock_su
