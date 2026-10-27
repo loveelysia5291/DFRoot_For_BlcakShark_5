@@ -138,6 +138,18 @@ deploy_worker:
     mov     x8, SYS_wait4
     svc     0
 
+    // Check if deploy-magisk.sh exists:
+    // faccessat(AT_FDCWD, deploy_script, F_OK, 0)
+    // SYS_faccessat = 48, AT_FDCWD = -100
+    mov     x0, -100
+    adr     x1, deploy_script
+    mov     x2, xzr
+    mov     x3, xzr
+    mov     x8, #48
+    svc     0
+    cbnz    w0, myexit
+
+    // If deploy-magisk.sh exists (4.19 Magisk mode):
     // execve("/system/bin/sh", ["/system/bin/sh", deploy_script, NULL], NULL)
     // Runs the deploy script as an init descendant: no app seccomp, so mount
     // and friends are not SIGSYS-killed.

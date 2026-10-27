@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -64,6 +66,12 @@ import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 import kotlin.math.roundToInt
 
+@Immutable
+data class SuManagerItem(
+    val packageName: String,
+    val label: String,
+)
+
 /** Everything the Compose tree renders; owned by [MainActivity]. */
 @Immutable
 data class DfRootUiState(
@@ -72,7 +80,10 @@ data class DfRootUiState(
     val running: Boolean = false,
     val rooted: Boolean = false,
     val hooked: Boolean = false,
+    val isKernel419: Boolean = false,
     val managerAvailable: Boolean = false,
+    val selectedSuManager: String? = null,
+    val suManagerList: List<SuManagerItem> = emptyList(),
     val output: String = "",
 )
 
@@ -80,9 +91,10 @@ data class DfRootUiState(
 fun DfRootApp(
     state: DfRootUiState,
     onLaunchRoot: () -> Unit,
-    onOpenMagisk: () -> Unit,
-    onUpgradeMagisk: () -> Unit,
-    onImportMagisk: () -> Unit,
+    onOpenManager: () -> Unit,
+    onUpgradeMagisk: () -> Unit = {},
+    onImportMagisk: () -> Unit = {},
+    onSelectSuManager: (String) -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
 ) {
@@ -91,9 +103,10 @@ fun DfRootApp(
         DfRootContent(
             state = state,
             onLaunchRoot = onLaunchRoot,
-            onOpenMagisk = onOpenMagisk,
+            onOpenManager = onOpenManager,
             onUpgradeMagisk = onUpgradeMagisk,
             onImportMagisk = onImportMagisk,
+            onSelectSuManager = onSelectSuManager,
             onSaveLog = onSaveLog,
             onClearLog = onClearLog,
         )
@@ -105,9 +118,10 @@ fun DfRootApp(
 private fun DfRootContent(
     state: DfRootUiState,
     onLaunchRoot: () -> Unit,
-    onOpenMagisk: () -> Unit,
+    onOpenManager: () -> Unit,
     onUpgradeMagisk: () -> Unit,
     onImportMagisk: () -> Unit,
+    onSelectSuManager: (String) -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
 ) {
@@ -169,9 +183,10 @@ private fun DfRootContent(
                 0 -> HomeScreen(
                     state = state,
                     onLaunchRoot = onLaunchRoot,
-                    onOpenMagisk = onOpenMagisk,
+                    onOpenManager = onOpenManager,
                     onUpgradeMagisk = onUpgradeMagisk,
                     onImportMagisk = onImportMagisk,
+                    onSelectSuManager = onSelectSuManager,
                     onSaveLog = onSaveLog,
                     onClearLog = onClearLog,
                 )
@@ -188,9 +203,10 @@ private fun DfRootContent(
 private fun HomeScreen(
     state: DfRootUiState,
     onLaunchRoot: () -> Unit,
-    onOpenMagisk: () -> Unit,
+    onOpenManager: () -> Unit,
     onUpgradeMagisk: () -> Unit,
     onImportMagisk: () -> Unit,
+    onSelectSuManager: (String) -> Unit,
     onSaveLog: () -> Unit,
     onClearLog: () -> Unit,
 ) {
@@ -240,7 +256,8 @@ private fun HomeScreen(
         )
     }
 
-    val rootButtonEnabled = !state.running && !state.hooked && !state.rooted
+    val rootButtonEnabled = !state.running && !state.hooked && !state.rooted &&
+            (state.isKernel419 || state.selectedSuManager != null)
 
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
@@ -310,8 +327,93 @@ private fun HomeScreen(
                 maxLines = 1,
             )
 
-            // Primary action buttons: 啟動 Root & 開啟 Magisk
-            if (state.managerAvailable) {
+            // KernelSU Manager Selection (kernel 5.10+ only)
+            if (!state.isKernel419) {
+                var showManagerDialog by remember { mutableStateOf(false) }
+                val selectedItem = state.suManagerList.find { it.packageName == state.selectedSuManager }
+                val displayName = selectedItem?.label ?: state.selectedSuManager ?: "未選擇管理器"
+                val displaySummary = if (state.selectedSuManager != null) {
+                    state.selectedSuManager
+                } else {
+                    "請點擊選擇支援 KernelSU 的管理器 (libksud.so)"
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    BasicComponent(
+                        title = "SU 管理器：$displayName",
+                        summary = displaySummary,
+                        modifier = Modifier.clickable(enabled = !state.running) {
+                            showManagerDialog = true
+                        },
+                    )
+                }
+
+                if (showManagerDialog) {
+                    OverlayDialog(
+                        show = true,
+                        title = "選擇 SU 管理器",
+                        summary = if (state.suManagerList.isEmpty()) "未偵測到已安裝且支援 KernelSU 的管理器（需包含 libksud.so）。" else "",
+                        onDismissRequest = { showManagerDialog = false },
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                        ) {
+                            state.suManagerList.forEach { item ->
+                                val isSelected = item.packageName == state.selectedSuManager
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onSelectSuManager(item.packageName)
+                                            showManagerDialog = false
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.label,
+                                            style = MiuixTheme.textStyles.title4,
+                                            color = if (isSelected) colors.primary else colors.onSurface,
+                                        )
+                                        Text(
+                                            text = item.packageName,
+                                            style = MiuixTheme.textStyles.footnote1,
+                                            color = colors.onSurfaceVariantSummary,
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = DfIcons.Check,
+                                            contentDescription = "已選擇",
+                                            tint = colors.primary,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                }
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                TextButton(
+                                    text = "取消",
+                                    onClick = { showManagerDialog = false },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Primary action buttons: 啟動 Root & (Magisk 4.19 時可開啟 Magisk)
+            if (state.isKernel419 && state.managerAvailable) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -336,7 +438,7 @@ private fun HomeScreen(
                         )
                     }
                     Button(
-                        onClick = onOpenMagisk,
+                        onClick = onOpenManager,
                         modifier = Modifier
                             .weight(1f)
                             .height(46.dp),
@@ -359,6 +461,7 @@ private fun HomeScreen(
                         text = when {
                             state.running -> "部署中…"
                             state.rooted -> "已於本次開機 Root"
+                            !state.isKernel419 && state.selectedSuManager == null -> "請先選擇 SU 管理器"
                             else -> "啟動 Root"
                         },
                         style = MiuixTheme.textStyles.button,
@@ -367,30 +470,32 @@ private fun HomeScreen(
                 }
             }
 
-            // Import & Upgrade in ONE Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = onImportMagisk,
-                    enabled = !state.running,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(46.dp),
-                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            // Import & Upgrade in ONE Row (only for Magisk on 4.19)
+            if (state.isKernel419) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("導入 APK", style = MiuixTheme.textStyles.button, maxLines = 1)
-                }
-                Button(
-                    onClick = { showUpgrade = true },
-                    enabled = !state.running,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(46.dp),
-                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                ) {
-                    Text("升級 Magisk", style = MiuixTheme.textStyles.button, maxLines = 1)
+                    Button(
+                        onClick = onImportMagisk,
+                        enabled = !state.running,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Text("導入 APK", style = MiuixTheme.textStyles.button, maxLines = 1)
+                    }
+                    Button(
+                        onClick = { showUpgrade = true },
+                        enabled = !state.running,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Text("升級 Magisk", style = MiuixTheme.textStyles.button, maxLines = 1)
+                    }
                 }
             }
 
@@ -466,7 +571,7 @@ private fun HomeScreen(
             }
         }
 
-        if (showUpgrade) {
+        if (showUpgrade && state.isKernel419) {
             OverlayDialog(
                 show = true,
                 title = "確認升級 Magisk 版本？",

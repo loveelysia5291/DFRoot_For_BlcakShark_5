@@ -133,11 +133,11 @@ android {
         checkReleaseBuilds = false
     }
 
-    // The native payload (libdfroot.so, built from app/src/main/jni/exp.c) is
-    // shipped prebuilt in src/main/jniLibs/arm64-v8a. AGP's CMake step hangs
-    // under the restricted build sandbox, and the C sources are unchanged, so
-    // the binary from the last validated build is packaged as-is. Re-enable
-    // externalNativeBuild when the C sources change on an unrestricted host.
+    externalNativeBuild {
+        cmake {
+            path("src/main/jni/CMakeLists.txt")
+        }
+    }
 
     packaging {
         jniLibs {

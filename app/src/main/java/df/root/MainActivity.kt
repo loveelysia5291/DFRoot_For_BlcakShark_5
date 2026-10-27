@@ -1,5 +1,7 @@
 package df.root
 
+import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -20,13 +22,9 @@ import java.util.concurrent.Executors
 /**
  * Compose + MIUIX host for DFRoot.
  *
- * The deploy itself still runs through [ExploitRunner] exactly as before; this
- * class only replaces the old single-button XML screen with a three-page
- * Compose UI (home / log / settings) that can be swiped.
- *
- * There is no longer any "import a Magisk APK" flow: the deploy reads the
- * installed manager's APK directly and extracts the binaries from it, so the
- * app only has to start the runner and show progress.
+ * The deploy itself still runs through [ExploitRunner]; this
+ * class hosts the Compose UI that supports Magisk on kernel 4.19
+ * and official KernelSU on kernel 5.10+.
  */
 class MainActivity : ComponentActivity(), IReporter, IProgress {
 
@@ -64,7 +62,6 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
         }
     }
 
-
     /* ------------------------------------------------------------- state --- */
 
     private var status by mutableStateOf("")
@@ -73,6 +70,8 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
     private var rooted by mutableStateOf(false)
     private var hooked by mutableStateOf(false)
     private var managerAvailable by mutableStateOf(false)
+    private var selectedSuManager by mutableStateOf<String?>(null)
+    private var suManagerList by mutableStateOf<List<SuManagerItem>>(emptyList())
     private var output by mutableStateOf("")
     private val logBuilder = StringBuilder()
 
@@ -81,6 +80,7 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        refreshSuManagers()
         updateRunButton()
 
         setContent {
@@ -91,15 +91,15 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
                     running = running,
                     rooted = rooted,
                     hooked = hooked,
+                    isKernel419 = ExploitRunner.isKernel419(),
                     managerAvailable = managerAvailable,
+                    selectedSuManager = selectedSuManager,
+                    suManagerList = suManagerList,
                     output = output,
                 ),
                 onLaunchRoot = { startRoot() },
-                onOpenMagisk = { ExploitRunner.openManager(this, this) },
+                onOpenManager = { ExploitRunner.openManager(this, this) },
                 onUpgradeMagisk = {
-                    // Only a confirmed "升級 Magisk 版本" may re-extract from the
-                    // installed manager APK; ExploitRunner turns this into
-                    // upgrade.request on the next run.
                     getSharedPreferences(ExploitRunner.PREFS_NAME, MODE_PRIVATE)
                         .edit()
                         .putBoolean(ExploitRunner.PREF_UPGRADE_MAGISK, true)
@@ -109,6 +109,7 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
                 onImportMagisk = {
                     pickApkLauncher.launch("application/vnd.android.package-archive")
                 },
+                onSelectSuManager = { pkg -> onSelectSuManager(pkg) },
                 onSaveLog = { saveLogToDownloads() },
                 onClearLog = {
                     logBuilder.setLength(0)
@@ -120,9 +121,50 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
 
     override fun onResume() {
         super.onResume()
-        // Re-read /proc and the deploy marker after the user returns from the
-        // settings screen or the Magisk manager.
-        if (!running) updateRunButton()
+        if (!running) {
+            refreshSuManagers()
+            updateRunButton()
+        }
+    }
+
+    private fun refreshSuManagers() {
+        if (ExploitRunner.isKernel419()) return
+        val pm = packageManager
+        val list = mutableListOf<SuManagerItem>()
+        for (ai in pm.getInstalledApplications(0)) {
+            if ((ai.flags and ApplicationInfo.FLAG_SYSTEM) != 0) continue
+            if (!ExploitRunner.hasKsud(ai)) continue
+            val label = pm.getApplicationLabel(ai).toString()
+            list.add(SuManagerItem(packageName = ai.packageName, label = label))
+        }
+        list.sortBy { it.label.lowercase() }
+        suManagerList = list
+
+        val prefs = createDeviceProtectedStorageContext()
+            .getSharedPreferences(ExploitRunner.PREFS_NAME, Context.MODE_PRIVATE)
+        val saved = prefs.getString(ExploitRunner.PREF_SU_MANAGER, null)
+        val found = list.any { it.packageName == saved }
+        if (found) {
+            selectedSuManager = saved
+        } else if (list.isNotEmpty()) {
+            selectedSuManager = list[0].packageName
+            prefs.edit().putString(ExploitRunner.PREF_SU_MANAGER, selectedSuManager).apply()
+        } else {
+            selectedSuManager = null
+            if (saved != null) {
+                prefs.edit().remove(ExploitRunner.PREF_SU_MANAGER).apply()
+            }
+        }
+    }
+
+    private fun onSelectSuManager(pkg: String) {
+        selectedSuManager = pkg
+        createDeviceProtectedStorageContext()
+            .getSharedPreferences(ExploitRunner.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(ExploitRunner.PREF_SU_MANAGER, pkg)
+            .apply()
+        updateRunButton()
     }
 
     /* ------------------------------------------------------------ reporter -- */
@@ -148,6 +190,10 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
     private fun startRoot() {
         // Single-flight guard: the runner must not be entered twice.
         if (running) return
+        if (!ExploitRunner.isKernel419() && selectedSuManager == null) {
+            Toast.makeText(this, "請先選擇 KernelSU 管理器", Toast.LENGTH_SHORT).show()
+            return
+        }
         running = true
         progress = 0f
         logBuilder.setLength(0)
@@ -159,9 +205,10 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
     private fun runExploit() {
         try {
             val rc = ExploitRunner.run(createDeviceProtectedStorageContext(), this)
+            val is419 = ExploitRunner.isKernel419()
             val msg = when (rc) {
                 0 -> "DFRoot：成功"
-                1 -> "DFRoot：失敗 — daemon／部署失敗（請查看紀錄）"
+                1 -> if (is419) "DFRoot：失敗 — daemon／部署失敗（請查看紀錄）" else "DFRoot：失敗 — ksud 非零退出"
                 2 -> "DFRoot：失敗 — 請檢查 logcat 與 dmesg"
                 else -> "DFRoot：失敗 — 檔案修補失敗"
             }
@@ -194,18 +241,24 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
     }
 
     private fun updateRunButton(keepStatus: Boolean = false) {
+        val is419 = ExploitRunner.isKernel419()
         hooked = File("/proc/dfroot_su").exists()
         rooted = ExploitRunner.isDeployedThisBoot()
-        managerAvailable = ExploitRunner.managerPackage() != null
+        managerAvailable = if (is419) {
+            ExploitRunner.managerPackage() != null
+        } else {
+            selectedSuManager != null
+        }
         // A successful deploy survives until the next boot, so the bar must not
         // fall back to 0% when the app is reopened.
         if (rooted) progress = 1f
         if (running || keepStatus) return
         status = when {
             hooked -> "Hook 運作中（部署進行中）"
-            rooted -> "Magisk su 已啟用，無需再次執行"
-            else -> "Magisk ${ExploitRunner.displayVersion(this)}｜核心：" +
+            rooted -> if (is419) "Magisk su 已啟用，無需再次執行" else "KernelSU 已啟用，無需再次執行"
+            is419 -> "Magisk ${ExploitRunner.displayVersion(this)}｜核心：" +
                 System.getProperty("os.version", "?")
+            else -> "KernelSU｜核心：" + System.getProperty("os.version", "?")
         }
     }
 

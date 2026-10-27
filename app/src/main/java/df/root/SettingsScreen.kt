@@ -122,7 +122,7 @@ fun SettingsScreen() {
             HorizontalDivider()
             BasicComponent(
                 title = "注入方式",
-                summary = "Magisk（LKM，kernel 4.19）",
+                summary = if (ExploitRunner.isKernel419()) "Magisk（LKM，kernel 4.19）" else "KernelSU（LKM，kernel 5.10+）",
             )
         }
 
