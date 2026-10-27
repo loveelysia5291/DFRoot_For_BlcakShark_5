@@ -1,4 +1,4 @@
-﻿build/
+build/
 .gradle/
 .gradle-home/
 local.properties
@@ -12,7 +12,6 @@ signing.properties
 # Kotlin/CMake build scratch and compiled kernel payloads (sources are tracked).
 .kotlin/
 app/.cxx/
-app/src/main/jni/ko/
 app/src/main/jni/splicehelper
 lkm/*.mod.c
 lkm/*.o
