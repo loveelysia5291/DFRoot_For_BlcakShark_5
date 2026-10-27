@@ -48,34 +48,10 @@ UI 圖示由 `DfIcons.kt` 以 `ImageVector` 直接繪製，不引入 `miuix-icon
 
 `app/build/outputs/apk/<variant>/DFRoot_<version>.apk`。
 
-## CI 與發 Release
 
-`.github/workflows/build.yml` 只有一個 job、一個指令 `./gradlew :app:assembleRelease`：
-
-| 觸發 | 結果 |
-|---|---|
-| push `master` / `main` | 建置、上傳 artifact |
-| PR | 同上 |
-| push tag `v*` | 建置 + 建立 GitHub Release，掛上 APK |
-
-```sh
-git tag v4.9.0
-git push origin master --tags
-```
-
-## 簽章
-
-1. `signing.properties` 存在**且**它指向的 keystore 真的在磁碟上 → 用你的金鑰
-2. 否則退回版控內的 `keystore/debug.keystore`（`android` / `android`），
-   與舊版 DFRoot 同憑證，可直接覆蓋安裝
-
-CI 要換金鑰就把 keystore 轉成 base64 存進 secret `KEYSTORE_BASE64`
-（`KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` 一起設），
-workflow 會自動解出來並寫 `signing.properties`。
 
 ## 注意
 
-- 僅支援 Magisk器，也不會用 APK 內容去猜哪個 App 是 Magisk
-
-更詳細的原生引擎與 kernel module 重建說明見 [`BUILD.md`](BUILD.md)。
+更詳細的說明與 kernel module 
+[`BUILD.md`](BUILD.md)。
 
