@@ -31,7 +31,7 @@ For Black Shark SHARK PAR-H0 的臨時 root 注入工具：
 Jetpack Compose + [MIUIX 0.9.4](https://github.com/compose-miuix-ui/miuix)
 （`top.yukonga.miuix.kmp:miuix-ui`）。
 
-- **首頁**：啟動 Root、部署進度、Magisk/LSPosed 
+- **首頁**：啟動 Root、部署進度、Magisk
 
 UI 圖示由 `DfIcons.kt` 以 `ImageVector` 直接繪製，不引入 `miuix-icons`
 （該 artifact 在 debug APK 內約占 3.6 MB dex，且包含上千個未使用圖示）。
