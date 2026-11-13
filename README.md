@@ -17,14 +17,9 @@ For Black Shark SHARK PAR-H0 的臨時 root 注入工具：
 ## 目前版本（4.9.6）
 
 **執行漏洞前請先安裝Magisk(https://github.com/topjohnwu/Magisk)
+內核版本大約等於5.10以上請安裝KernelSU(https://github.com/tiann/KernelSU)
 
-部署流程（`app/src/main/assets/deploy-magisk.sh`）：
 
-1. 須先安裝Magisk
-2. 取出管理器的 APK，比對 md5：與上次部署相同就跳過解壓
-3. 版本／簽章：APK md5 有變就清掉 `magisk.db` 裡舊的 `keystore` 憑證，
-   讓 magiskd 重新學習，避免管理器被 Magisk 判成簽章不符而移除
-4. 部署完整檔案集到 `/data/adb/magisk`，su 只留在 `/debug_ramdisk/su`
 
 ## 介面
 
