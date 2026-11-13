@@ -17,6 +17,8 @@ For Black Shark SHARK PAR-H0 的臨時 root 注入工具：
 ## 目前版本（4.9.6）
 
 **執行漏洞前請先安裝Magisk(https://github.com/topjohnwu/Magisk)
+越獄模式Magisk(https://github.com/loveelysia5291/Magisk/releases/tag/temp-root-v31.1)
+fix_lsp腳本僅支援Magisk（https://github.com/loveelysia5291/Fix_Lsp_Magisk/releases/tag/Fix_Lsp_Magisk_V3）
 內核版本大約等於5.10以上請安裝KernelSU(https://github.com/tiann/KernelSU)
 
 
