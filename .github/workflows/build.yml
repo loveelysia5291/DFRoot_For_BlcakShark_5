@@ -104,7 +104,7 @@ jobs:
 
             DFRoot_For_BlcakShark_5 ${{ steps.ver.outputs.version }}
 
-            該版本只支援Magisk 31.1以上版本
+            支援 KernelSU (ksud late-load)
             系統版本:JOYUI13 22.06.20
             核心版本:4.19.113-perf-g957c7e270183
             版本號碼:PTRT2206200OS00MP1  

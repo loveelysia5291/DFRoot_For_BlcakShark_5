@@ -195,6 +195,13 @@ static int disable_modules(void)
 
 int main(void)
 {
+    /* Single-execution guard in case both UMH and deploy_worker invoke bootstrap */
+    int mfd = open("/dev/df_bootstrapped", O_CREAT | O_EXCL | O_WRONLY, 0666);
+    if (mfd < 0) {
+        return 0;
+    }
+    close(mfd);
+
     touch("/dev/dfm1");
     char su_manager[256];
     int soft_reboot, disable_mods;

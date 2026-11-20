@@ -30,10 +30,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * Compose/MIUIX replacement for the old SettingsActivity +
- * PreferenceFragment. It edits the same two device-protected preferences the
- * deploy script reads (`soft_reboot`, `disable_modules`) and the same
- * BootReceiver enabled state used by "Start at Boot".
+ * Compose/MIUIX Settings screen for DFRoot (KernelSU).
  */
 @Composable
 fun SettingsScreen() {
@@ -50,9 +47,7 @@ fun SettingsScreen() {
     var disableModules by remember {
         mutableStateOf(prefs.getBoolean(ExploitRunner.PREF_DISABLE_MODULES, false))
     }
-    // displayVersion() opens the installed manager APK; do not repeat that on
-    // every switch toggle.
-    val magiskVersion = remember { ExploitRunner.displayVersion(context) }
+    val ksuVersion = remember { ExploitRunner.displayVersion(context) }
     val kernelVersion = remember { System.getProperty("os.version", "?") }
 
     Column(
@@ -61,13 +56,13 @@ fun SettingsScreen() {
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp),
     ) {
-        SmallTitle("部署")
+        SmallTitle("偏好設定")
 
         Card(modifier = Modifier.padding(horizontal = 16.dp)) {
             SettingSwitchRow(
                 icon = DfIcons.Play,
-                title = "開機自動執行",
-                summary = "裝置開機後自動執行 DFRoot，不必手動開啟 App。",
+                title = "開機自動部署",
+                summary = "設定開機後自動執行 DFRoot，不需手動開啟 App。",
                 checked = bootStart,
             ) { checked ->
                 bootStart = checked
@@ -78,10 +73,9 @@ fun SettingsScreen() {
 
             SettingSwitchRow(
                 icon = DfIcons.Refresh,
-                title = "自動軟重啟（LSPosed）",
-                summary = "開啟：部署後準備 LSPosed 並自動重新啟動 zygote。\n"
-                    + "關閉：只準備 LSPosed 原則與管理器；請自行啟動 "
-                    + "Zygisk Next／lspd，再重新啟動 zygote。",
+                title = "自動軟重啟 (LSPosed)",
+                summary = "啟用：部署後自動重啟 Android zygote 以加載 LSPosed。\n"
+                    + "停用：不自動重啟 zygote。",
                 checked = softReboot,
             ) { checked ->
                 softReboot = checked
@@ -93,8 +87,7 @@ fun SettingsScreen() {
             SettingSwitchRow(
                 icon = DfIcons.Block,
                 title = "停用所有模組（本次）",
-                summary = "模組導致無法開機時開啟。下一次部署會停用所有 Magisk 模組，"
-                    + "並在部署完成後自動恢復。",
+                summary = "當模組導致無法開機時使用。下一次部署時會停用所有 KernelSU 模組，並在部署完成後自動恢復。",
                 checked = disableModules,
             ) { checked ->
                 disableModules = checked
@@ -111,8 +104,8 @@ fun SettingsScreen() {
             )
             HorizontalDivider()
             BasicComponent(
-                title = "Magisk 版本",
-                summary = magiskVersion,
+                title = "KernelSU 管理器",
+                summary = ksuVersion,
             )
             HorizontalDivider()
             BasicComponent(
@@ -121,8 +114,8 @@ fun SettingsScreen() {
             )
             HorizontalDivider()
             BasicComponent(
-                title = "注入方式",
-                summary = if (ExploitRunner.isKernel419()) "Magisk（LKM，kernel 4.19）" else "KernelSU（LKM，kernel 5.10+）",
+                title = "注入框架",
+                summary = "KernelSU (ksud late-load)",
             )
         }
 
@@ -160,8 +153,6 @@ private fun SettingSwitchRow(
             )
         },
         endActions = {
-            // The whole row toggles; the switch itself stays non-interactive so
-            // a tap cannot fire both handlers.
             Switch(checked = checked, onCheckedChange = null)
         },
     )

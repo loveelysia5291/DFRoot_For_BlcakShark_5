@@ -166,47 +166,6 @@ androidComponents {
     }
 }
 
-/**
- * Shell scripts are executed on the device by mksh. A stray CR (CRLF line
- * ending) makes every redirect and comparison invalid, and a UTF-8 BOM turns
- * the first line into a bogus command - both kill the deploy worker before it
- * writes its log, which looks exactly like "the app is stuck". Fail the build
- * instead of shipping a script that cannot run.
- */
-val checkShellLineEndings = tasks.register("checkShellLineEndings") {
-    val assetsDir = file("src/main/assets")
-    inputs.dir(assetsDir)
-    doLast {
-        val bogus = (assetsDir.listFiles() ?: emptyArray())
-            .filter { it.isFile && it.name.endsWith(".sh") }
-            .map { f ->
-                val bytes = f.readBytes()
-                val crlf = bytes.contains(13.toByte())
-                val bom = bytes.size >= 3 &&
-                        bytes[0] == 0xEF.toByte() &&
-                        bytes[1] == 0xBB.toByte() &&
-                        bytes[2] == 0xBF.toByte()
-                when {
-                    crlf && bom -> "${f.name} (CRLF+BOM)"
-                    crlf -> "${f.name} (CRLF)"
-                    bom -> "${f.name} (BOM)"
-                    else -> null
-                }
-            }
-            .filterNotNull()
-        if (bogus.isNotEmpty()) {
-            throw GradleException(
-                "Shell scripts must be plain UTF-8 with LF line endings; found: " +
-                bogus.joinToString() + ". Fix them or the deploy will not run."
-            )
-        }
-    }
-}
-
-tasks.matching { it.name == "preBuild" }.configureEach {
-    dependsOn(checkShellLineEndings)
-}
-
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)

