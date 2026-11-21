@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * The ten 24dp glyphs this UI needs.
+ * The five 24dp glyphs this UI needs.
  *
  * They live here instead of depending on `top.yukonga.miuix.kmp:miuix-icons`,
  * which ships a thousand-plus icon classes. In a debug APK that artifact alone
@@ -37,24 +37,6 @@ object DfIcons {
         }
     }
 
-    val Records: ImageVector by lazy {
-        build("DfRoot.Records") {
-            stroke {
-                moveTo(8.5f, 6.5f)
-                lineTo(20.5f, 6.5f)
-                moveTo(8.5f, 12f)
-                lineTo(20.5f, 12f)
-                moveTo(8.5f, 17.5f)
-                lineTo(20.5f, 17.5f)
-            }
-            fill {
-                circle(4.5f, 6.5f, 1.1f)
-                circle(4.5f, 12f, 1.1f)
-                circle(4.5f, 17.5f, 1.1f)
-            }
-        }
-    }
-
     val Settings: ImageVector by lazy {
         build("DfRoot.Settings") {
             stroke {
@@ -73,54 +55,6 @@ object DfIcons {
         }
     }
 
-    val Import: ImageVector by lazy {
-        build("DfRoot.Import") {
-            stroke {
-                moveTo(12f, 3.5f)
-                lineTo(12f, 14.5f)
-                moveTo(7.5f, 10f)
-                lineTo(12f, 14.5f)
-                lineTo(16.5f, 10f)
-                moveTo(4.5f, 16.5f)
-                lineTo(4.5f, 20.5f)
-                lineTo(19.5f, 20.5f)
-                lineTo(19.5f, 16.5f)
-            }
-        }
-    }
-
-    val Download: ImageVector by lazy {
-        build("DfRoot.Download") {
-            stroke {
-                moveTo(12f, 3.5f)
-                lineTo(12f, 15f)
-                moveTo(7.5f, 10.5f)
-                lineTo(12f, 15f)
-                lineTo(16.5f, 10.5f)
-                moveTo(5f, 20.5f)
-                lineTo(19f, 20.5f)
-            }
-        }
-    }
-
-    val Layers: ImageVector by lazy {
-        build("DfRoot.Layers") {
-            stroke {
-                moveTo(12f, 3f)
-                lineTo(21f, 8f)
-                lineTo(12f, 13f)
-                lineTo(3f, 8f)
-                close()
-                moveTo(3f, 12f)
-                lineTo(12f, 17f)
-                lineTo(21f, 12f)
-                moveTo(3f, 16f)
-                lineTo(12f, 21f)
-                lineTo(21f, 16f)
-            }
-        }
-    }
-
     val Play: ImageVector by lazy {
         build("DfRoot.Play") {
             fill {
@@ -128,46 +62,6 @@ object DfIcons {
                 lineTo(19f, 12f)
                 lineTo(8f, 19f)
                 close()
-            }
-        }
-    }
-
-    val Refresh: ImageVector by lazy {
-        build("DfRoot.Refresh") {
-            stroke {
-                moveTo(19.5f, 8.5f)
-                curveTo(18f, 5.8f, 15.2f, 4f, 12f, 4f)
-                curveTo(7.6f, 4f, 4f, 7.6f, 4f, 12f)
-                curveTo(4f, 16.4f, 7.6f, 20f, 12f, 20f)
-                curveTo(15.2f, 20f, 18f, 18.2f, 19.5f, 15.5f)
-                moveTo(15.5f, 8.5f)
-                lineTo(19.5f, 8.5f)
-                lineTo(19.5f, 4.5f)
-            }
-        }
-    }
-
-    val Block: ImageVector by lazy {
-        build("DfRoot.Block") {
-            stroke {
-                moveTo(12f, 3.5f)
-                curveTo(16.7f, 3.5f, 20.5f, 7.3f, 20.5f, 12f)
-                curveTo(20.5f, 16.7f, 16.7f, 20.5f, 12f, 20.5f)
-                curveTo(7.3f, 20.5f, 3.5f, 16.7f, 3.5f, 12f)
-                curveTo(3.5f, 7.3f, 7.3f, 3.5f, 12f, 3.5f)
-                close()
-                moveTo(6.5f, 6.5f)
-                lineTo(17.5f, 17.5f)
-            }
-        }
-    }
-
-    val ChevronRight: ImageVector by lazy {
-        build("DfRoot.ChevronRight") {
-            stroke {
-                moveTo(9.5f, 6f)
-                lineTo(15.5f, 12f)
-                lineTo(9.5f, 18f)
             }
         }
     }

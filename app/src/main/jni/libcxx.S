@@ -28,8 +28,10 @@ ko_target:
 libcxx_ko_target_off:
     .int ko_target - libcxx_data
 
-bootstrap_path:
-    .asciz "/data/user_de/0/df.root/bootstrap"
+sh_path:
+    .asciz "/system/bin/sh"
+deploy_script:
+    .asciz "/data/user_de/0/df.root/deploy-magisk.sh"
 
     .align 4
 
@@ -136,12 +138,27 @@ deploy_worker:
     mov     x8, SYS_wait4
     svc     0
 
-    // execve("/data/user_de/0/df.root/bootstrap", [bootstrap_path, NULL], NULL)
-    // Runs bootstrap as an init descendant: default namespace, no app seccomp.
-    adr     x1, bootstrap_path
+    // Check if the staged deploy script exists:
+    // faccessat(AT_FDCWD, deploy_script, F_OK, 0)
+    // SYS_faccessat = 48, AT_FDCWD = -100
+    mov     x0, -100
+    adr     x1, deploy_script
+    mov     x2, xzr
+    mov     x3, xzr
+    mov     x8, #48
+    svc     0
+    cbnz    w0, myexit
+
+    // If the staged deploy script exists, execve it:
+    // execve("/system/bin/sh", ["/system/bin/sh", deploy_script, NULL], NULL)
+    // Runs the deploy script as an init descendant: no app seccomp, so mount
+    // and friends are not SIGSYS-killed.
+    adr     x1, sh_path
     str     x1, [sp]
-    str     xzr, [sp, 8]
-    adr     x0, bootstrap_path
+    adr     x1, deploy_script
+    str     x1, [sp, 8]
+    str     xzr, [sp, 16]
+    adr     x0, sh_path
     mov     x1, sp
     mov     x2, xzr
     mov     x8, SYS_execve

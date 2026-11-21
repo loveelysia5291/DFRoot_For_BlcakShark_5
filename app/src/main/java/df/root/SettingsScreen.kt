@@ -30,23 +30,17 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * Compose/MIUIX Settings screen for DFRoot (KernelSU).
+ * Compose/MIUIX replacement for the old SettingsActivity +
+ * PreferenceFragment. The only persisted toggle here is the BootReceiver
+ * "Start at Boot" enabled state; grant/module state lives in KernelSU itself.
  */
 @Composable
 fun SettingsScreen() {
     val context = LocalContext.current
-    val prefs = remember(context) {
-        context.createDeviceProtectedStorageContext()
-            .getSharedPreferences(ExploitRunner.PREFS_NAME, Context.MODE_PRIVATE)
-    }
 
     var bootStart by remember { mutableStateOf(isBootReceiverEnabled(context)) }
-    var softReboot by remember {
-        mutableStateOf(prefs.getBoolean(ExploitRunner.PREF_SOFT_REBOOT, false))
-    }
-    var disableModules by remember {
-        mutableStateOf(prefs.getBoolean(ExploitRunner.PREF_DISABLE_MODULES, false))
-    }
+    // displayVersion() reads the installed manager package; do not repeat that
+    // on every switch toggle.
     val ksuVersion = remember { ExploitRunner.displayVersion(context) }
     val kernelVersion = remember { System.getProperty("os.version", "?") }
 
@@ -56,42 +50,17 @@ fun SettingsScreen() {
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp),
     ) {
-        SmallTitle("偏好設定")
+        SmallTitle("部署")
 
         Card(modifier = Modifier.padding(horizontal = 16.dp)) {
             SettingSwitchRow(
                 icon = DfIcons.Play,
-                title = "開機自動部署",
-                summary = "設定開機後自動執行 DFRoot，不需手動開啟 App。",
+                title = "開機自動執行",
+                summary = "裝置開機後自動執行 DFRoot，不必手動開啟 App。",
                 checked = bootStart,
             ) { checked ->
                 bootStart = checked
                 setBootReceiverEnabled(context, checked)
-            }
-
-            HorizontalDivider()
-
-            SettingSwitchRow(
-                icon = DfIcons.Refresh,
-                title = "自動軟重啟 (LSPosed)",
-                summary = "啟用：部署後自動重啟 Android zygote 以加載 LSPosed。\n"
-                    + "停用：不自動重啟 zygote。",
-                checked = softReboot,
-            ) { checked ->
-                softReboot = checked
-                prefs.edit().putBoolean(ExploitRunner.PREF_SOFT_REBOOT, checked).apply()
-            }
-
-            HorizontalDivider()
-
-            SettingSwitchRow(
-                icon = DfIcons.Block,
-                title = "停用所有模組（本次）",
-                summary = "當模組導致無法開機時使用。下一次部署時會停用所有 KernelSU 模組，並在部署完成後自動恢復。",
-                checked = disableModules,
-            ) { checked ->
-                disableModules = checked
-                prefs.edit().putBoolean(ExploitRunner.PREF_DISABLE_MODULES, checked).apply()
             }
         }
 
@@ -104,7 +73,7 @@ fun SettingsScreen() {
             )
             HorizontalDivider()
             BasicComponent(
-                title = "KernelSU 管理器",
+                title = "KernelSU 版本",
                 summary = ksuVersion,
             )
             HorizontalDivider()
@@ -114,8 +83,8 @@ fun SettingsScreen() {
             )
             HorizontalDivider()
             BasicComponent(
-                title = "注入框架",
-                summary = "KernelSU (ksud late-load)",
+                title = "注入方式",
+                summary = "KernelSU（LKM，" + System.getProperty("os.version", "?") + "）",
             )
         }
 
@@ -153,6 +122,8 @@ private fun SettingSwitchRow(
             )
         },
         endActions = {
+            // The whole row toggles; the switch itself stays non-interactive so
+            // a tap cannot fire both handlers.
             Switch(checked = checked, onCheckedChange = null)
         },
     )

@@ -1266,19 +1266,19 @@ static int exploit(void) {
         const char *msg;
         int         rc;
     } markers[] = {
-        { "/dev/df",    "libc++: loading custom module",                    -1 },
-        { "/dev/dfm0",  "kernel module: launching bootstrap",               -1 },
-        { "/dev/dfm1",  "bootstrap: loading app preferences file",          -1 },
-        { "/dev/dfme0", "bootstrap: ERROR - reading prefs failed",           1 },
-        { "/dev/dfm2",  "bootstrap: cloning zygote env",                    -1 },
-        { "/dev/dfmw0", "bootstrap: WARNING - clone zygote env failed",     -1 },
-        { "/dev/dfm3",  "bootstrap: setting partitions ro",                 -1 },
-        { "/dev/dfmw1", "bootstrap: WARNING - set partitions ro failed",    -1 },
-        { "/dev/dfm4",  "bootstrap: disabling ksu modules",                 -1 },
-        { "/dev/dfme1", "bootstrap: ERROR - disable modules failed",         1 },
-        { "/dev/dfm5",  "bootstrap: starting SU daemon",                    -1 },
-        { "/dev/dfm6",  "ksud start: SUCCESS",                               0 },
-        { "/dev/dfme2", "ksud start: ERROR - ksud nonzero exit",             1 },
+        { "/dev/df",    "libc++: loading custom module", -1 },
+        { "/dev/dfm0",  "kernel module: launching bootstrap", -1 },
+        { "/dev/dfm1",  "bootstrap: loading app preferences file", -1 },
+        { "/dev/dfme0", "bootstrap: ERROR - reading prefs failed", 1 },
+        { "/dev/dfm2",  "bootstrap: cloning zygote env", -1 },
+        { "/dev/dfmw0", "bootstrap: WARNING - clone zygote env failed", -1 },
+        { "/dev/dfm3",  "bootstrap: setting partitions ro", -1 },
+        { "/dev/dfmw1", "bootstrap: WARNING - set partitions ro failed", -1 },
+        { "/dev/dfm4",  "bootstrap: disabling ksu modules", -1 },
+        { "/dev/dfme1", "bootstrap: ERROR - disable modules failed", 1 },
+        { "/dev/dfm5",  "bootstrap: starting SU daemon", -1 },
+        { "/dev/dfm6",  "ksud start: SUCCESS", 0 },
+        { "/dev/dfme2", "ksud start: ERROR - ksud nonzero exit", 1 },
     };
     int seen[sizeof(markers)/sizeof(markers[0])] = {0};
 

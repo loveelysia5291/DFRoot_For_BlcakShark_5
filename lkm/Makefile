@@ -8,13 +8,13 @@ CFLAGS_dfroot.o := -Os -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-s
 all:
 	$(MAKE) -C $(KDIR) M=$(CURDIR) \
 		ARCH=arm64 \
-		LLVM=1 \
+		CROSS_COMPILE=/home/user/tc/bin/aarch64-buildroot-linux-gnu- \
 		modules
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(CURDIR) \
 		ARCH=arm64 \
-		LLVM=1 \
+		CROSS_COMPILE=/home/user/tc/bin/aarch64-buildroot-linux-gnu- \
 		clean
 	rm -f dfroot.lds
 
