@@ -162,14 +162,20 @@ KSUD_BIN="$KSUD"
 sleep 0.1
 progress 90
 
-# Best-effort: bring the KernelSU manager forward. Plain launch only — no
-# force-stop; ksud owns its own manager restart. Runs detached so it never
-# blocks deploy completion.
+# Restart the manager so it re-acquires the ksu fd from the newly loaded module.
 (
     sleep 1
-    /system/bin/am start --user 0 -a android.intent.action.MAIN \
-        -c android.intent.category.LAUNCHER \
-        -p "$MGR_PKG" >/dev/null 2>&1
+    case "$MGR_PKG" in
+        *ksunext*)
+            MGR_ACT="com.rifsxd.ksunext.ui.MainActivity"
+            ;;
+        *)
+            MGR_ACT="me.weishu.kernelsu.ui.MainActivity"
+            ;;
+    esac
+    /system/bin/am force-stop "$MGR_PKG" >/dev/null 2>&1
+    /system/bin/am start "$MGR_PKG/$MGR_ACT" >/dev/null 2>&1 || \
+        /system/bin/am start -n "$MGR_PKG/$MGR_ACT" >/dev/null 2>&1
 ) &
 
 RESULT=ok

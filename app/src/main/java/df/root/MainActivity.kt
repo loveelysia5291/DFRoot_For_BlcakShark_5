@@ -215,7 +215,6 @@ class MainActivity : ComponentActivity(), IReporter, IProgress {
                     progress = 1f
                     rooted = true
                     managerAvailable = true
-                    ExploitRunner.openManager(this, this)
                 } else {
                     rooted = false
                 }
