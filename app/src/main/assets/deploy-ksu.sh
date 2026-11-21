@@ -167,17 +167,9 @@ progress 90
 # blocks deploy completion.
 (
     sleep 1
-    # 1. Try monkey (most reliable app launcher via shell on Android)
-    /system/bin/monkey -p "$MGR_PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || \
-    # 2. Try am start with explicit user 0
     /system/bin/am start --user 0 -a android.intent.action.MAIN \
         -c android.intent.category.LAUNCHER \
-        -p "$MGR_PKG" >/dev/null 2>&1 || \
-    # 3. Try resolving the launcher component explicitly
-    {
-        ACT=$(cmd package resolve-activity --brief --user 0 "$MGR_PKG" 2>/dev/null | tail -n 1)
-        [ -n "$ACT" ] && /system/bin/am start --user 0 -n "$ACT" >/dev/null 2>&1
-    }
+        -p "$MGR_PKG" >/dev/null 2>&1
 ) &
 
 RESULT=ok
