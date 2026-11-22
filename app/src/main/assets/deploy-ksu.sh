@@ -74,7 +74,7 @@ mark_done() {
 trap 'mark_done; exit 1' EXIT INT TERM
 
 log "=== deploy-ksu.sh start pid=$$ date=$(date) ==="
-log "DEPLOY_BUILD=offfix47 no-bundle-ksud uapi-cache dual-ko-bucket manager-extract-only"
+log "DEPLOY_BUILD=offfix47 no-bundle-ksud uapi-cache dual-ko-bucket manager-extract-only no-manual-am-start ksud-owns-manager-restart"
 
 # ---- sanity: worker must already be root ------------------------------------
 if [ "$(id -u 2>/dev/null || echo 0)" != "0" ]; then
@@ -162,21 +162,10 @@ KSUD_BIN="$KSUD"
 sleep 0.1
 progress 90
 
-# Restart the manager so it re-acquires the ksu fd from the newly loaded module.
-(
-    sleep 1
-    case "$MGR_PKG" in
-        *ksunext*)
-            MGR_ACT="com.rifsxd.ksunext.ui.MainActivity"
-            ;;
-        *)
-            MGR_ACT="me.weishu.kernelsu.ui.MainActivity"
-            ;;
-    esac
-    /system/bin/am force-stop "$MGR_PKG" >/dev/null 2>&1
-    /system/bin/am start "$MGR_PKG/$MGR_ACT" >/dev/null 2>&1 || \
-        /system/bin/am start -n "$MGR_PKG/$MGR_ACT" >/dev/null 2>&1
-) &
+# Manager restart is owned by ksud itself: late-load step 14 runs
+# `am force-stop <pkg>` then `am start -n <pkg>/...MainActivity` when
+# bringing the manager up against the new module. Do NOT issue a second
+# manual am start here — race condition with ksud's own restart.
 
 RESULT=ok
 mark_done
