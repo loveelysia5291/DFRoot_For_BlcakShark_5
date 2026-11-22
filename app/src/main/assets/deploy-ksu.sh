@@ -132,8 +132,8 @@ else
     INSMOD=insmod
 fi
 
-if grep -q '^ksu ' /proc/modules 2>/dev/null; then
-    log "ksu.ko already loaded in kernel"
+if grep -q '^kernelsu ' /proc/modules 2>/dev/null || grep -q '^ksu ' /proc/modules 2>/dev/null; then
+    log "kernelsu already loaded in kernel"
     RC=0
 else
     "$INSMOD" "$KSUKO" spoof_uname=0
