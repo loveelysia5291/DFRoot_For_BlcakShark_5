@@ -3,19 +3,16 @@
 # DFRoot -> KernelSU late-load deployment (Black Shark 5, SHARK PAR-H0)
 # kernel 4.19.113-perf, non-GKI, RAM-only.
 #
-# Fixes vs. original deploy-ksu.sh:
-#   1. Transitions ksud into u:r:ksu:s0 via /proc/self/attr/exec before exec,
-#      compensating for external `insmod` (where kernel escape_to_root_for_init
-#      only elevates the short-lived insmod process, not ksud).
-#   2. Logs ksud late-load output to /data/local/tmp/ksud-late-load.log instead
-#      of discarding it to /dev/null.
-#   3. Waits for the daemonized `ksud late-load` process to finish (up to 15s)
-#      instead of sleeping 0.1s and exiting immediately.
-#   4. Verifies whether ksud actually restarted the Manager; if not, performs a
-#      clean fallback `am force-stop` + `am start` (with `monkey` fallback).
-#   5. Explicitly restores SELinux to Enforcing (`setenforce 1` /
-#      `/sys/fs/selinux/enforce`) if still Permissive after late-load finishes.
-#   6. Prevents duplicate DEPLOY_DONE lines via DONE_WRITTEN guard.
+# Build: offfix49
+#   1. Transitions ksud into u:r:ksu:s0 via /proc/self/attr/exec before exec.
+#   2. Redirects ksud/am output to /dev/null (NOT /data/local/tmp) so SELinux
+#      Enforcing cannot fail shell redirection and skip executing ksud/am.
+#   3. Waits for the daemonized `ksud late-load` process to finish (up to 15s).
+#   4. Attempts fallback `am force-stop` + `am start` (with `monkey` fallback)
+#      if the Manager is not running.
+#   5. Restores SELinux to Enforcing if still Permissive after late-load.
+#   6. Restores $DONE_MARKER permissions/owner to match $STAGE in mark_done()
+#      to prevent uninstall code 39 / mkdirs failed on reinstall.
 # ==============================================================================
 
 export PATH=/debug_ramdisk:/system/xbin:/system/bin:/sbin:/vendor/bin
@@ -25,7 +22,6 @@ STAGE=/data/user_de/0/df.root
 PREFS=$STAGE/shared_prefs/dfroot.xml
 DONE_MARKER=$STAGE/deploy.done
 MIRROR_DONE=/data/local/tmp/ksu-deploy.done
-KSUD_LOG=/data/local/tmp/ksud-late-load.log
 ADBDIR=/data/adb/ksu
 KSUD_INSTALL=/data/adb/ksud
 KSUKO=$STAGE/ksu.ko
@@ -122,18 +118,18 @@ restore_selinux_enforcing() {
     [ "$_after" = "1" ]
 }
 
-# Restart and open KernelSU Manager cleanly.
+# Restart and open KernelSU Manager cleanly (uses /dev/null so redirection never fails).
 restart_manager_fallback() {
     _pkg="$1"
     log "running fallback manager launch for $_pkg"
-    run_in_ksu_ctx am force-stop "$_pkg" >>"$KSUD_LOG" 2>&1 || true
+    run_in_ksu_ctx am force-stop "$_pkg" >/dev/null 2>&1 || true
     sleep 0.2
-    if run_in_ksu_ctx am start -n "$_pkg/me.weishu.kernelsu.ui.MainActivity" >>"$KSUD_LOG" 2>&1; then
+    if run_in_ksu_ctx am start --user 0 -n "$_pkg/me.weishu.kernelsu.ui.MainActivity" >/dev/null 2>&1; then
         log "am start MainActivity succeeded"
         return 0
     fi
     log "am start MainActivity failed; trying monkey launcher fallback"
-    run_in_ksu_ctx monkey -p "$_pkg" -c android.intent.category.LAUNCHER 1 >>"$KSUD_LOG" 2>&1 || true
+    run_in_ksu_ctx monkey -p "$_pkg" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
 }
 
 # Completion signal only (not a log). The Runner polls this marker to finish.
@@ -143,12 +139,15 @@ mark_done() {
     _line="DEPLOY_DONE $(date) result=$RESULT"
     echo "$_line" > "$MIRROR_DONE" 2>/dev/null
     echo "$_line" > "$DONE_MARKER" 2>/dev/null
+    chmod 0666 "$DONE_MARKER" 2>/dev/null
+    _owner=$(stat -c '%u:%g' "$STAGE" 2>/dev/null)
+    [ -n "$_owner" ] && chown "$_owner" "$DONE_MARKER" 2>/dev/null
 }
 
 trap 'mark_done; exit 1' EXIT INT TERM
 
 log "=== deploy-ksu.sh start pid=$$ date=$(date) ==="
-log "DEPLOY_BUILD=offfix48 ksu-ctx-exec wait-late-load fallback-am-start restore-selinux"
+log "DEPLOY_BUILD=offfix49 ksu-ctx-exec safe-redir wait-late-load fallback-am-start restore-selinux fix-done-owner"
 
 # ---- sanity: worker must already be root ------------------------------------
 if [ "$(id -u 2>/dev/null || echo 0)" != "0" ]; then
@@ -216,14 +215,13 @@ fi
 log "ksu.ko insmod returned 0 (selinux=$(get_selinux_enforce))"
 progress 75
 
-# ---- ksud late-load (in u:r:ksu:s0 context, logged & waited) ----------------
+# ---- ksud late-load (in u:r:ksu:s0 context, safe /dev/null redir & waited) --
 adopt_zygote_env
 
 KSUD_BIN="$KSUD_INSTALL"
 [ -x "$KSUD_BIN" ] || KSUD_BIN="$KSUD"
 
-: > "$KSUD_LOG" 2>/dev/null
-run_in_ksu_ctx "$KSUD_BIN" late-load --package-name "$MGR_PKG" >>"$KSUD_LOG" 2>&1
+run_in_ksu_ctx "$KSUD_BIN" late-load --package-name "$MGR_PKG" >/dev/null 2>&1
 KSUD_RC=$?
 log "ksud late-load spawn rc=$KSUD_RC"
 
@@ -242,16 +240,8 @@ done
 log "ksud late-load wait finished (ticks=$_waited)"
 progress 90
 
-# ---- verify manager launch (fallback if ksud step 14 did not run/succeed) ---
-_mgr_restarted=0
-if grep -q "Restarting KernelSU Manager" "$KSUD_LOG" 2>/dev/null; then
-    sleep 0.5
-    if pidof "$MGR_PKG" >/dev/null 2>&1; then
-        _mgr_restarted=1
-        log "manager already restarted by ksud late-load"
-    fi
-fi
-if [ "$_mgr_restarted" = "0" ]; then
+# ---- fallback manager launch if not running ---------------------------------
+if ! pidof "$MGR_PKG" >/dev/null 2>&1; then
     restart_manager_fallback "$MGR_PKG"
 fi
 
