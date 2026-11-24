@@ -16,10 +16,10 @@
 
 ## 目前版本（4.9.6）
 
-**執行漏洞前請先安裝 KernelSU 或 KernelSU-Next 管理器 APK。**
+**執行漏洞前請先安裝 KernelSU 管理器。**
 
 部署流程：
-1. 自動檢測已安裝的 KernelSU 管理器（`me.weishu.kernelsu`、`io.github.a13e300.ksu` 等）。
+1. 檢測已安裝的 KernelSU 管理器
 2. 將管理器的 `libksud.so` 提取並暫存為 `/data/user_de/0/df.root/ksud`。
 3. 將原生 `libbootstrap.so` 暫存為 `/data/user_de/0/df.root/bootstrap`。
 4. 執行 `libdfroot.so` 觸發內核漏洞並掛載 LKM 模組。
