@@ -240,8 +240,9 @@ done
 log "ksud late-load wait finished (ticks=$_waited)"
 progress 90
 
----------------------------
+# ---- stop stale manager before cold start ----------------------------
 run_in_ksu_ctx am force-stop "$MGR_PKG" >/dev/null 2>&1 || true
+
 
 # ---- restore SELinux Enforcing if still Permissive --------------------------
 restore_selinux_enforcing || log "WARN: failed to restore SELinux to Enforcing"
